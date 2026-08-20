@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
   UploadCloud,
   FileText,
@@ -35,6 +36,34 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<'all' | 'skripsi' | 'tesis' | 'magang' | 'ta'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Typewriter effect for hero headline
+  const fullHeadline = 'Pisahkan Bab Dokumen Skripsi PDF dengan Mudah';
+  const [typedHeadline, setTypedHeadline] = useState('');
+  const [isTypingDone, setIsTypingDone] = useState(false);
+
+  useEffect(() => {
+    let charIndex = 0;
+    setTypedHeadline('');
+    setIsTypingDone(false);
+
+    // Initial brief delay for natural feel before typing begins
+    const timeout = setTimeout(() => {
+      const interval = setInterval(() => {
+        if (charIndex < fullHeadline.length) {
+          setTypedHeadline(fullHeadline.slice(0, charIndex + 1));
+          charIndex++;
+        } else {
+          setIsTypingDone(true);
+          clearInterval(interval);
+        }
+      }, 50); // 50ms per character for smooth, natural manual typing speed
+
+      return () => clearInterval(interval);
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, []);
 
   const categories = [
     { id: 'all', label: 'Semua Dokumen', icon: GraduationCap },
@@ -117,10 +146,16 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         })}
       </div>
 
-      {/* Hero Headline */}
+      {/* Hero Headline with Typewriter Effect */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-neutral-900 tracking-tight leading-tight">
-          Pisahkan Bab Dokumen Skripsi PDF dengan Mudah
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-neutral-900 tracking-tight leading-tight min-h-[72px] sm:min-h-[84px] md:min-h-[110px] flex items-center justify-center flex-wrap">
+          <span>{typedHeadline}</span>
+          {!isTypingDone && (
+            <span
+              className="inline-block w-[3px] sm:w-[4px] h-[0.9em] bg-[#FF385C] ml-1.5 align-middle rounded-full animate-pulse"
+              aria-hidden="true"
+            />
+          )}
         </h1>
         <p className="text-sm sm:text-base text-neutral-600 font-normal leading-relaxed">
           Temukan batas halaman Cover, Abstrak, BAB I s/d BAB V, Daftar Pustaka, hingga Lampiran secara rapi langsung dari berkas PDF Anda.
@@ -262,8 +297,15 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         )}
       </div>
 
-      {/* Quick Demo Test Section (Airbnb Floating Banner) */}
-      <div id="tour-sample-section" className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Quick Demo Test Section (Airbnb Floating Banner with Scroll Reveal) */}
+      <motion.div
+        id="tour-sample-section"
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}
+        className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4"
+      >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-rose-50 text-[#FF385C] border border-rose-100 flex items-center justify-center shrink-0">
             <Compass className="w-5 h-5" />
@@ -289,11 +331,43 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
             <span>Muat Contoh PDF Skripsi</span>
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Feature Badges (Airbnb 3-Column Bento Cards) */}
-      <div id="tour-features-summary" className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-        <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs hover:shadow-md transition-shadow space-y-3">
+      {/* Feature Badges (Airbnb 3-Column Bento Cards with Staggered Scroll-Triggered Animation) */}
+      <motion.div
+        id="tour-features-summary"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.25 }}
+        variants={{
+          hidden: { opacity: 0 },
+          visible: {
+            opacity: 1,
+            transition: {
+              staggerChildren: 0.12,
+              delayChildren: 0.05,
+            },
+          },
+        }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4"
+      >
+        {/* Card 1: Presisi Deteksi Bab */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 35, scale: 0.95 },
+            visible: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 240,
+                damping: 22,
+              },
+            },
+          }}
+          className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs hover:shadow-md transition-shadow space-y-3"
+        >
           <div className="w-10 h-10 rounded-2xl bg-rose-50 text-[#FF385C] border border-rose-100 flex items-center justify-center font-bold text-sm">
             <SlidersHorizontal className="w-5 h-5" />
           </div>
@@ -303,9 +377,25 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           <p className="text-xs text-neutral-500 leading-relaxed">
             Mendeteksi judul bab naskah utama secara akurat dan menyaring baris referensi pada Daftar Isi bertitik agar tidak salah potong.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs hover:shadow-md transition-shadow space-y-3">
+        {/* Card 2: Preview & Hapus Massal */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 35, scale: 0.95 },
+            visible: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 240,
+                damping: 22,
+              },
+            },
+          }}
+          className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs hover:shadow-md transition-shadow space-y-3"
+        >
           <div className="w-10 h-10 rounded-2xl bg-neutral-100 text-neutral-800 border border-neutral-200 flex items-center justify-center font-bold text-sm">
             <Layers className="w-5 h-5" />
           </div>
@@ -315,9 +405,25 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           <p className="text-xs text-neutral-500 leading-relaxed">
             Periksa halaman tiap bab dengan penampil PDF langsung, atur rentang halaman, atau tahan kartu untuk menghapus beberapa bab sekaligus.
           </p>
-        </div>
+        </motion.div>
 
-        <div className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs hover:shadow-md transition-shadow space-y-3">
+        {/* Card 3: 100% Privasi di Browser */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 35, scale: 0.95 },
+            visible: {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 240,
+                damping: 22,
+              },
+            },
+          }}
+          className="bg-white p-6 rounded-3xl border border-neutral-200 shadow-xs hover:shadow-md transition-shadow space-y-3"
+        >
           <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center font-bold text-sm">
             <Lock className="w-5 h-5" />
           </div>
@@ -327,8 +433,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           <p className="text-xs text-neutral-500 leading-relaxed">
             Seluruh proses pemotongan dan penataan halaman berlangsung sepenuhnya di perangkat Anda tanpa pernah dikirim ke internet.
           </p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };

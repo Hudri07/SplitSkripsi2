@@ -233,7 +233,7 @@ export default function App() {
       />
 
       {/* Main App Content Viewport */}
-      <main className="flex-1">
+      <main className="flex-1 pt-20 sm:pt-24 pb-12">
         {stage === 'upload' && (
           <FileUploader
             selectedFile={selectedFile}
@@ -292,7 +292,7 @@ export default function App() {
       <footer className="mt-auto border-t border-neutral-200 bg-[#F7F7F7] py-8 text-xs text-neutral-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1">
-            <span className="font-bold text-neutral-900">© 2026 SplitSkripsi</span>
+            <span className="font-latin text-lg font-bold text-neutral-900">© 2026 SplitSkripsi</span>
             <span>·</span>
             <span className="text-neutral-500">Pemisah Dokumen PDF Skripsi, Tesis, & Laporan Akademik</span>
             <span className="hidden sm:inline">·</span>

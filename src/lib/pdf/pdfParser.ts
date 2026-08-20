@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { ExtractedPage, DocumentMetadata } from '../../types';
 import { detectPdfStructure } from '../detector/structureDetector';
+import { detectStudentInfo } from '../detector/studentDetector';
 
 // Setup pdfjs worker
 if (typeof window !== 'undefined') {
@@ -83,6 +84,7 @@ export async function parsePdfDocument(
   const isScanned = totalChars < 50 || avgCharsPerPage < 15;
 
   const detectionResult = detectPdfStructure(pages);
+  const studentInfo = detectStudentInfo(pages);
 
   onProgress?.(95, 'Menyusun pembagian struktur berkas...');
 
@@ -95,6 +97,8 @@ export async function parsePdfDocument(
     isScannedPdf: isScanned,
     hasHeadings: !isScanned,
     estimatedDocType: estimatePdfDocType(pages),
+    studentName: studentInfo.name,
+    studentNim: studentInfo.nim,
   };
 
   return {

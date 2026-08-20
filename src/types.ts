@@ -48,6 +48,8 @@ export interface DocumentMetadata {
   isScannedPdf?: boolean;
   hasHeadings?: boolean;
   estimatedDocType?: string; // 'Skripsi' | 'Tesis' | 'Laporan Magang' | 'Laporan Tugas Akhir' | 'Dokumen Akademik'
+  studentName?: string;
+  studentNim?: string;
 }
 
 export interface AnalysisProgress {

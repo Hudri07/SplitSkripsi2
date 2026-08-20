@@ -271,9 +271,25 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
             <h2 className="text-base sm:text-lg md:text-xl font-bold text-neutral-900 mt-1.5 break-words line-clamp-2">
               {metadata.fileName}
             </h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              Total {metadata.totalUnits} Halaman • Klik preview pada masing-masing bab untuk memeriksa halaman
-            </p>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500 mt-0.5">
+              <span>Total {metadata.totalUnits} Halaman</span>
+              {metadata.studentName && (
+                <>
+                  <span>•</span>
+                  <span className="text-neutral-700 font-medium">
+                    Mahasiswa: <strong>{metadata.studentName}</strong>
+                  </span>
+                </>
+              )}
+              {metadata.studentNim && (
+                <>
+                  <span>•</span>
+                  <span className="font-mono text-neutral-700">
+                    NIM: <strong>{metadata.studentNim}</strong>
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

@@ -13,6 +13,14 @@
   }
 }
 
+.font-latin {
+  font-family: 'Dancing Script', 'Caveat', cursive, sans-serif;
+}
+
+.font-brand-latin {
+  font-family: 'Dancing Script', 'Caveat', cursive, sans-serif;
+}
+
 /* Airbnb Signature Accents */
 .btn-rausch {
   background: linear-gradient(to right, #E61E4D 0%, #E31C5F 50%, #D70466 100%);
@@ -50,18 +58,18 @@
 }
 
 /* ========================================================
-   Airbnb-style Hover Scrollbar System
-   Subtle & transparent on idle, expands & darkens on hover
+   SplitSkripsi Signature Rose-Pink Scrollbar System
+   Subtle on idle, glows with SplitSkripsi red-pink on hover
    ======================================================== */
 
 /* Global Scrollbar Base */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(34, 34, 34, 0.18) transparent;
+  scrollbar-color: rgba(255, 56, 92, 0.25) transparent;
 }
 
 html:hover {
-  scrollbar-color: rgba(34, 34, 34, 0.4) transparent;
+  scrollbar-color: #FF385C transparent;
 }
 
 ::-webkit-scrollbar {
@@ -76,31 +84,33 @@ html:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.12);
+  background-color: rgba(255, 56, 92, 0.22);
   border-radius: 9999px;
   background-clip: padding-box;
   border: 1.5px solid transparent;
   transition: background-color 0.25s cubic-bezier(0.2, 0, 0, 1), transform 0.2s ease;
 }
 
-/* On Container Hover: Smoothly darken scrollbar thumb to Airbnb neutral */
+/* On Container Hover: Smoothly brighten scrollbar thumb to SplitSkripsi soft rose */
 *:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.32);
+  background-color: rgba(255, 56, 92, 0.55);
 }
 
 /* On Scrollbar Thumb Direct Hover / Drag */
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(34, 34, 34, 0.65) !important;
+  background-color: #FF385C !important;
+  background-image: linear-gradient(135deg, #FF385C 0%, #E00B41 100%) !important;
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background-color: #222222 !important;
+  background-color: #D70466 !important;
+  background-image: linear-gradient(135deg, #E00B41 0%, #BD1E59 100%) !important;
 }
 
-/* Dedicated Airbnb Scrollbar Utility Classes */
+/* Dedicated SplitSkripsi Scrollbar Utility Classes */
 .airbnb-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(34, 34, 34, 0.12) transparent;
+  scrollbar-color: rgba(255, 56, 92, 0.2) transparent;
   scroll-behavior: smooth;
 }
 
@@ -116,7 +126,7 @@ html:hover {
 }
 
 .airbnb-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: rgba(255, 56, 92, 0.2);
   border-radius: 9999px;
   background-clip: padding-box;
   border: 1px solid transparent;
@@ -124,18 +134,20 @@ html:hover {
 }
 
 .airbnb-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(34, 34, 34, 0.35);
+  background-color: rgba(255, 56, 92, 0.55);
 }
 
 .airbnb-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(34, 34, 34, 0.7) !important;
+  background-color: #FF385C !important;
+  background-image: linear-gradient(135deg, #FF385C 0%, #E00B41 100%) !important;
 }
 
 .airbnb-scrollbar::-webkit-scrollbar-thumb:active {
-  background-color: #222222 !important;
+  background-color: #D70466 !important;
+  background-image: linear-gradient(135deg, #E00B41 0%, #BD1E59 100%) !important;
 }
 
 .airbnb-scrollbar:hover {
-  scrollbar-color: rgba(34, 34, 34, 0.38) transparent;
+  scrollbar-color: #FF385C transparent;
 }
 

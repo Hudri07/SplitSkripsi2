@@ -99,7 +99,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                 <span>Unduh Semua Sekaligus (.ZIP)</span>
               </h4>
               <p className="text-xs text-neutral-600 leading-relaxed">
-                Klik tombol ini untuk mengunduh seluruh file hasil potongan skripsi dalam satu bundel arsip <code>skripsi_split.zip</code>.
+                Klik tombol ini untuk mengunduh seluruh file hasil potongan skripsi dalam satu arsip ZIP rapi berfolder <code>skripsi [nama siswa] - [nim]</code>.
               </p>
             </div>
           ),
@@ -130,7 +130,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
           <div>
             <h4 className="font-bold text-neutral-900 text-sm flex items-center gap-1.5 mb-1">
               <Compass className="w-4 h-4 text-[#FF385C]" />
-              <span>Selamat Datang di SplitSkripsi</span>
+              <span>Selamat Datang di <strong className="font-latin text-base font-bold text-[#FF385C]">SplitSkripsi</strong></span>
             </h4>
             <p className="text-xs text-neutral-600 leading-relaxed">
               Alat bantu untuk memisahkan dokumen PDF Skripsi, Tesis, dan Laporan Akademik secara rapi per bab dengan mudah.
