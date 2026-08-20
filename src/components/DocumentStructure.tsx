@@ -235,6 +235,26 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
     onUpdateSections(reordered);
   };
 
+  // --- Auto-Bridge Contiguous Chapter Spanning Handler ---
+  const handleAutoBridgeContiguous = () => {
+    if (sections.length <= 1) return;
+    // Sort sections by start page
+    const sorted = [...sections].sort((a, b) => a.start - b.start);
+    const bridged = sorted.map((sec, idx) => {
+      const isLast = idx === sorted.length - 1;
+      const nextStart = isLast ? metadata.totalUnits : sorted[idx + 1].start;
+      const end = isLast ? metadata.totalUnits : Math.max(sec.start, nextStart - 1);
+      const count = Math.max(1, end - sec.start + 1);
+      return {
+        ...sec,
+        order: idx + 1,
+        end,
+        count,
+      };
+    });
+    onUpdateSections(bridged);
+  };
+
   // --- Add Section Handler ---
   const handleAddNewSection = (e: React.FormEvent) => {
     e.preventDefault();
@@ -420,6 +440,17 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAutoBridgeContiguous}
+              title="Rapatkan rentang bab secara otomatis agar bab saat ini menyambung penuh hingga halaman sebelum bab berikutnya (misal BAB IV Hal 40-77 jika BAB V mulai Hal 78)"
+              className="px-3.5 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-neutral-200/80 shadow-2xs active:scale-97"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#FF385C]" />
+              <span className="hidden sm:inline">Rapatkan Rentang Bab</span>
+              <span className="sm:hidden">Rapatkan</span>
+            </button>
+
             <button
               type="button"
               id="btn-add-section"

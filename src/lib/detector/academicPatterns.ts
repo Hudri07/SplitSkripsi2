@@ -16,8 +16,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 1,
     regexList: [
-      /^(?:halaman\s+)?(?:sampul|cover|judul\s+luar)/i,
-      /^(?:proposal|skripsi|tesis|disertasi|laporan\s+(?:tugas\s+akhir|magang|penelitian|kkn|pkl|prakerin))/i,
+      /^(?:halaman\s+)?(?:sampul|cover|judul\s+luar)$/i,
+      /^(?:proposal\s+skripsi|laporan\s+tugas\s+akhir|laporan\s+skripsi|skripsi)$/i,
     ],
   },
   {
@@ -26,8 +26,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 2,
     regexList: [
-      /^(?:halaman\s+judul|title\s+page)/i,
-      /diajukan\s+(?:untuk|sebagai\s+salah\s+satu\s+syarat)/i,
+      /^(?:halaman\s+judul|title\s+page)$/i,
+      /^diajukan\s+(?:untuk|sebagai\s+salah\s+satu\s+syarat)/i,
     ],
   },
   {
@@ -36,9 +36,9 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 3,
     regexList: [
-      /^(?:lembar(?:an)?\s+)?(?:pengesahan|persetujuan|pembimbing|penguji)/i,
-      /^tanda\s+persetujuan/i,
-      /^approval\s+sheet/i,
+      /^(?:lembar(?:an)?\s+)?(?:pengesahan|persetujuan|pembimbing|penguji)(?:\s+skripsi|\s+tugas\s+akhir|\s+tesis)?$/i,
+      /^tanda\s+persetujuan(?:\s+skripsi|\s+tugas\s+akhir)?$/i,
+      /^approval\s+sheet$/i,
     ],
   },
   {
@@ -47,9 +47,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 4,
     regexList: [
-      /^(?:surat\s+|lembar\s+)?pernyataan\s+(?:keaslian|orisionalitas|bebas\s+plagiat|integritas|otentisitas)/i,
-      /^statement\s+of\s+(?:originality|authenticity)/i,
-      /menyatakan\s+bahwa\s+(?:skripsi|tesis|karya\s+ilmiah)\s+ini/i,
+      /^(?:surat\s+|lembar\s+)?pernyataan\s+(?:keaslian|orisionalitas|bebas\s+plagiat|integritas|otentisitas)(?:\s+skripsi|\s+karya\s+ilmiah)?$/i,
+      /^statement\s+of\s+(?:originality|authenticity)$/i,
     ],
   },
   {
@@ -58,7 +57,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 5,
     regexList: [
-      /^(?:halaman\s+)?(?:persembahan|motto|motto\s+dan\s+persembahan|dedication)/i,
+      /^(?:halaman\s+)?(?:persembahan|motto|motto\s+dan\s+persembahan|dedication)$/i,
     ],
   },
   {
@@ -89,7 +88,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 8,
     regexList: [
-      /^(?:kata\s+pengantar|prakata|foreword|preface|ucapan\s+terima\s+kasih|acknowledgements?)/i,
+      /^(?:kata\s+pengantar|prakata|foreword|preface|ucapan\s+terima\s+kasih|acknowledgements?)$/i,
     ],
   },
   {
@@ -98,7 +97,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 9,
     regexList: [
-      /^daftar\s+isi(?:\s+skripsi)?$/i,
+      /^daftar\s+isi(?:\s+skripsi|\s+laporan)?$/i,
       /^table\s+of\s+contents?$/i,
       /^isi\s+laporan$/i,
     ],
@@ -221,6 +220,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
       /^bab\s+(?:vii|7|tujuh)(?:\s*[:.\-]\s*|\s+)(.*)$/i,
       /^chapter\s+(?:7|vii|seven)(?:\s*[:.\-]\s*|\s+)(.*)$/i,
       /^bab\s+(?:vii|7|tujuh)\.?$/i,
+      /^chapter\s+(?:7|vii|seven)\.?$/i,
     ],
   },
 
@@ -241,9 +241,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'backmatter',
     priority: 50,
     regexList: [
-      /^(?:lampiran|appendi(?:x|ces))(?:\s*[:.\-]\s*|\s+)(.*)$/i,
-      /^(?:lampiran|appendi(?:x|ces)|daftar\s+lampiran\s+lengkap)$/i,
-      /^lampiran\s+[a-z0-9]+/i,
+      /^(?:lampiran|appendi(?:x|ces))(?:\s*[:.\-]\s*|\s+[a-z0-9]+|\s*)$/i,
+      /^(?:daftar\s+lampiran\s+lengkap)$/i,
     ],
   },
   {
@@ -252,7 +251,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'backmatter',
     priority: 60,
     regexList: [
-      /^(?:daftar\s+|biodata\s+|curriculum\s+vitae|riwayat\s+hidup|profil\s+penulis|biografi\s+penulis)/i,
+      /^(?:biodata(?:\s+penulis|\s+peneliti|\s+mahasiswa)?|curriculum\s+vitae|riwayat\s+hidup(?:\s+penulis|\s+peneliti)?|profil\s+penulis|biografi\s+penulis)$/i,
     ],
   },
 ];
