@@ -5,8 +5,6 @@ import { calculateConfidence, formatSectionTitle, isLikelyTocLine, EvaluationCon
 interface CandidatePoint {
   title: string;
   normalizedKey: string;
-  category: 'frontmatter' | 'chapter' | 'backmatter' | 'other';
-  rank: number;
   start: number; // 1-based page or 0-based para
   confidence: number;
   snippet?: string;
@@ -14,35 +12,8 @@ interface CandidatePoint {
   needsReview?: boolean;
 }
 
-// Canonical structural rank for Indonesian academic thesis lifecycle
-const CANONICAL_RANKS: Record<string, number> = {
-  cover: 10,
-  title_page: 20,
-  approval: 30,
-  declaration: 40,
-  dedication_motto: 50,
-  abstract_id: 60,
-  abstract_en: 70,
-  preface: 80,
-  toc: 90,
-  table_list: 100,
-  figure_list: 110,
-  appendix_list: 120,
-  bab_1: 200,
-  bab_2: 300,
-  bab_3: 400,
-  bab_4: 500,
-  bab_5: 600,
-  bab_6: 700,
-  bab_7: 800,
-  bibliography: 900,
-  appendix: 1000,
-  curriculum_vitae: 1100,
-};
-
 /**
- * Detect sections from extracted PDF pages with strict structural hierarchy
- * and deduplication so chapters are not fragmented into multiple sub-cards.
+ * Detect sections from extracted PDF pages
  */
 export function detectPdfStructure(pages: ExtractedPage[]): {
   sections: DocumentSection[];
@@ -61,34 +32,9 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
   });
 
   const tocPageSet = new Set(detectedTocPages);
+  const candidates: CandidatePoint[] = [];
 
-  // Step 2: Detect repeating running headers across pages (e.g. line 0 headers on multiple pages)
-  const headerFrequency = new Map<string, number>();
-  pages.forEach((page) => {
-    if (page.lines.length > 0) {
-      const top0 = page.lines[0].trim().toUpperCase();
-      if (top0.length > 3 && top0.length < 120) {
-        headerFrequency.set(top0, (headerFrequency.get(top0) || 0) + 1);
-      }
-      if (page.lines.length > 1) {
-        const top1 = page.lines[1].trim().toUpperCase();
-        if (top1.length > 3 && top1.length < 120) {
-          headerFrequency.set(top1, (headerFrequency.get(top1) || 0) + 1);
-        }
-      }
-    }
-  });
-
-  // Lines appearing 3 or more times at the very top of pages are running headers
-  const isRepeatingHeader = (line: string): boolean => {
-    const normalized = line.trim().toUpperCase();
-    const count = headerFrequency.get(normalized) || 0;
-    return count >= 3;
-  };
-
-  const rawCandidates: CandidatePoint[] = [];
-
-  // Step 3: Scan pages for section headers
+  // Step 2: Scan pages for section headers
   pages.forEach((page) => {
     const isTocPage = tocPageSet.has(page.pageNumber);
 
@@ -100,15 +46,10 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
       }
     });
 
-    // Check top lines of the page
-    for (let lineIdx = 0; lineIdx < Math.min(page.lines.length, 6); lineIdx++) {
+    // Check lines (especially top lines)
+    for (let lineIdx = 0; lineIdx < Math.min(page.lines.length, 8); lineIdx++) {
       const line = page.lines[lineIdx].trim();
       if (!line) continue;
-
-      // Skip running headers that repeat identically on 3+ pages
-      if (lineIdx <= 1 && isRepeatingHeader(line)) {
-        continue;
-      }
 
       // Check against academic patterns
       for (const pattern of ACADEMIC_PATTERNS) {
@@ -122,10 +63,11 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
         }
 
         if (isMatch) {
-          // If this is a BAB, check if the next line is the subtitle (e.g. BAB IV \n HASIL DAN PEMBAHASAN)
+          // If this is a BAB, check if the next line is the subtitle (e.g. BAB I \n PENDAHULUAN)
           let fullHeading = line;
           if (pattern.category === 'chapter' && lineIdx + 1 < page.lines.length) {
             const nextLine = page.lines[lineIdx + 1].trim();
+            // If next line is uppercase subtitle without page break / dot leaders
             if (nextLine && nextLine.length > 2 && nextLine.length < 80 && !isLikelyTocLine(nextLine)) {
               if (nextLine === nextLine.toUpperCase() || /^[A-Z]/.test(nextLine)) {
                 fullHeading = `${line} ${nextLine}`;
@@ -145,22 +87,20 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
           const result = calculateConfidence(pattern, fullHeading, ctx);
 
           // Only accept if not a ToC reference and confidence is reasonable
-          if (!result.isToc && result.confidence >= 50) {
+          if (!result.isToc && result.confidence >= 45) {
             const formattedTitle = formatSectionTitle(fullHeading, pattern.defaultTitle, pattern.key);
-            const rank = CANONICAL_RANKS[pattern.key] || 500;
 
-            const existingOnSamePage = rawCandidates.find((c) => c.start === page.pageNumber);
+            // Avoid duplicate pattern candidate on the exact same page
+            const existingOnSamePage = candidates.find((c) => c.start === page.pageNumber);
             if (!existingOnSamePage || result.confidence > existingOnSamePage.confidence) {
               if (existingOnSamePage) {
-                const idx = rawCandidates.indexOf(existingOnSamePage);
-                rawCandidates.splice(idx, 1);
+                const idx = candidates.indexOf(existingOnSamePage);
+                candidates.splice(idx, 1);
               }
 
-              rawCandidates.push({
+              candidates.push({
                 title: formattedTitle,
                 normalizedKey: pattern.key,
-                category: pattern.category,
-                rank: rank,
                 start: page.pageNumber,
                 confidence: result.confidence,
                 snippet: page.lines.slice(0, 3).join(' ').substring(0, 120),
@@ -175,12 +115,8 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
     }
   });
 
-  // Step 4: Structural Filtering & Deduplication
-  // This solves the problem where BAB 4 repeats on later pages or gets fragmented.
-  const filteredCandidates = filterAndDeduplicateCandidates(rawCandidates, totalPages);
-
-  // Step 5: Build non-overlapping contiguous sections
-  const sections = buildContiguousSections(filteredCandidates, totalPages, 1);
+  // Step 3: Build non-overlapping contiguous sections
+  const sections = buildContiguousSections(candidates, totalPages, 1);
   return { sections, detectedTocPages };
 }
 
@@ -195,7 +131,7 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
   if (totalParagraphs === 0) return { sections: [], detectedTocIndexes: [] };
 
   const detectedTocIndexes: number[] = [];
-  const rawCandidates: CandidatePoint[] = [];
+  const candidates: CandidatePoint[] = [];
 
   // Step 1: Scan for ToC sections
   paragraphs.forEach((p) => {
@@ -221,6 +157,7 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
       if (isMatch) {
         let fullHeading = text;
 
+        // Check if next paragraph is subtitle
         if (pattern.category === 'chapter' && p.index + 1 < paragraphs.length) {
           const nextP = paragraphs[p.index + 1];
           const nextText = nextP.text.trim();
@@ -247,20 +184,16 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
 
         const result = calculateConfidence(pattern, fullHeading, ctx);
 
-        if (!result.isToc && result.confidence >= 50) {
+        if (!result.isToc && result.confidence >= 45) {
           const formattedTitle = formatSectionTitle(fullHeading, pattern.defaultTitle, pattern.key);
-          const rank = CANONICAL_RANKS[pattern.key] || 500;
 
-          const isDuplicate = rawCandidates.some(
-            (c) => Math.abs(c.start - p.index) <= 2 && c.normalizedKey === pattern.key
-          );
+          // Avoid duplicate nearby candidates (within 2 paragraphs)
+          const isDuplicate = candidates.some((c) => Math.abs(c.start - p.index) <= 2 && c.normalizedKey === pattern.key);
 
           if (!isDuplicate) {
-            rawCandidates.push({
+            candidates.push({
               title: formattedTitle,
               normalizedKey: pattern.key,
-              category: pattern.category,
-              rank: rank,
               start: p.index,
               confidence: result.confidence,
               snippet: text.substring(0, 100),
@@ -274,70 +207,13 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
     }
   });
 
-  const filteredCandidates = filterAndDeduplicateCandidates(rawCandidates, totalParagraphs);
-  const sections = buildContiguousSections(filteredCandidates, totalParagraphs - 1, 0);
+  // Step 3: Build sections
+  const sections = buildContiguousSections(candidates, totalParagraphs - 1, 0);
   return { sections, detectedTocIndexes };
 }
 
 /**
- * Filter and deduplicate candidates according to canonical academic structure:
- * 1. For each chapter / major section, keep ONLY the first occurrence (minimum start page).
- * 2. Frontmatter cannot appear after BAB 1 has started.
- * 3. Chapter order must strictly progress monotonically (BAB 1 -> BAB 2 -> BAB 3 -> BAB 4 -> BAB 5 -> Daftar Pustaka -> Lampiran).
- * 4. Eliminates false-positive fragments inside chapters so that BAB 4 (hal 40-77) is 1 unified card before BAB 5 (hal 78).
- */
-function filterAndDeduplicateCandidates(
-  candidates: CandidatePoint[],
-  totalUnits: number
-): CandidatePoint[] {
-  if (candidates.length === 0) return [];
-
-  // Sort strictly by start ascending
-  const sorted = [...candidates].sort((a, b) => a.start - b.start);
-
-  const seenKeys = new Set<string>();
-  const validCandidates: CandidatePoint[] = [];
-
-  let bab1StartIndex = Infinity;
-  let highestChapterRank = 0;
-
-  for (const cand of sorted) {
-    // Check if this candidate is BAB 1 or higher
-    if (cand.category === 'chapter' && cand.normalizedKey === 'bab_1') {
-      if (cand.start < bab1StartIndex) {
-        bab1StartIndex = cand.start;
-      }
-    }
-
-    // Rule 1: Frontmatter items CANNOT appear after BAB 1 has started
-    if (cand.category === 'frontmatter' && cand.start >= bab1StartIndex) {
-      continue;
-    }
-
-    // Rule 2: Chapter and Backmatter Keys MUST be unique (keep only the FIRST start page!)
-    // If bab_4 was detected at page 40, any mention of bab_4 at page 56 or 65 is a running header or quote.
-    if (seenKeys.has(cand.normalizedKey)) {
-      continue;
-    }
-
-    // Rule 3: Enforce monotonic chapter progression
-    // If we have already started BAB 4 (rank 500), we cannot accept BAB 2 (rank 300) or BAB 3 (rank 400) on later pages.
-    if (cand.category === 'chapter' || cand.category === 'backmatter') {
-      if (cand.rank < highestChapterRank) {
-        continue;
-      }
-      highestChapterRank = Math.max(highestChapterRank, cand.rank);
-    }
-
-    seenKeys.add(cand.normalizedKey);
-    validCandidates.push(cand);
-  }
-
-  return validCandidates;
-}
-
-/**
- * Helper to build ordered, contiguous start-end ranges without gaps
+ * Helper to build ordered, contiguous start-end ranges
  */
 function buildContiguousSections(
   candidates: CandidatePoint[],
@@ -407,7 +283,7 @@ function buildContiguousSections(
     });
   }
 
-  // Re-number orders sequentially
+  // Re-number orders
   return result.map((s, idx) => ({
     ...s,
     order: idx + 1,
