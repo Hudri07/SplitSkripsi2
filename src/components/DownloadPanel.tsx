@@ -41,6 +41,11 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
   const activeFolderName = buildZipFolderName(studentName, studentNim, metadata.fileName);
   const activeZipFileName = `${activeFolderName}.zip`;
 
+  // Sorted results ensuring 01 is always first and 09 is last
+  const sortedResults = [...results].sort((a, b) =>
+    a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
+  );
+
   const handleDownloadSingle = (item: SplitResultItem) => {
     const a = document.createElement('a');
     a.href = item.url;
@@ -61,10 +66,16 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
       // "skripsi [nama siswa] - [nim]" or "skripsi [nama siswa]"
       const folder = zip.folder(activeFolderName) || zip;
 
-      // Add each split PDF item blob to the folder inside zip
-      for (const item of results) {
-        folder.file(item.filename, item.blob);
-      }
+      // Base date for consistent archive index
+      const baseDate = new Date();
+
+      // Add each split PDF item blob in strict ascending order (01, 02, 03... 09)
+      sortedResults.forEach((item, idx) => {
+        folder.file(item.filename, item.blob, {
+          date: new Date(baseDate.getTime() + idx * 1000),
+          comment: item.rangeText,
+        });
+      });
 
       // Generate the zip package
       const content = await zip.generateAsync({
@@ -227,15 +238,15 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
             </div>
 
             <div className="pl-6 space-y-1.5 border-l-2 border-dashed border-neutral-200 ml-2 py-1">
-              {results.slice(0, 4).map((item, idx) => (
+              {sortedResults.slice(0, 4).map((item, idx) => (
                 <div key={item.id} className="flex items-center gap-2 text-neutral-700">
                   <FileText className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
                   <span className="text-neutral-800">{item.filename}</span>
                 </div>
               ))}
-              {results.length > 4 && (
+              {sortedResults.length > 4 && (
                 <div className="text-neutral-400 italic text-[11px] pl-1">
-                  ... dan {results.length - 4} berkas bab lainnya
+                  ... dan {sortedResults.length - 4} berkas bab lainnya
                 </div>
               )}
             </div>
@@ -273,7 +284,7 @@ export const DownloadPanel: React.FC<DownloadPanelProps> = ({
         </div>
 
         <div id="tour-download-list" className="divide-y divide-neutral-100">
-          {results.map((item, idx) => (
+          {sortedResults.map((item, idx) => (
             <div
               key={item.id}
               className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-neutral-50/80 transition-colors"

@@ -27,9 +27,20 @@ export async function createZipBundle(
   // Create subfolder inside ZIP
   const folder = zip.folder(folderName) || zip;
 
+  // Ensure files are strictly sorted in natural ascending order (01, 02, 03... 09, 10)
+  const sortedItems = [...items].sort((a, b) =>
+    a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
+  );
+
+  // Set a consistent base timestamp so archive viewers display files in logical order
+  const fixedDate = new Date();
+
   // Add each split file into the subfolder
-  items.forEach((item) => {
-    folder.file(item.filename, item.blob);
+  sortedItems.forEach((item, idx) => {
+    folder.file(item.filename, item.blob, {
+      date: new Date(fixedDate.getTime() + idx * 1000),
+      comment: item.rangeText,
+    });
   });
 
   const blob = await zip.generateAsync(

@@ -25,9 +25,15 @@ export async function splitPdfDocument(
   const totalPagesInDoc = sourcePdf.getPageCount();
   const results: SplitResultItem[] = [];
 
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i];
-    onProgress?.(i + 1, sections.length, section.title);
+  // Guarantee that sections are strictly sorted from beginning to end (Page 1 -> Page N)
+  // and assign clean sequential orders (1, 2, 3...)
+  const orderedSections = [...sections]
+    .sort((a, b) => a.start - b.start || a.order - b.order)
+    .map((s, idx) => ({ ...s, order: idx + 1 }));
+
+  for (let i = 0; i < orderedSections.length; i++) {
+    const section = orderedSections[i];
+    onProgress?.(i + 1, orderedSections.length, section.title);
 
     // Create a new blank PDF document
     const newPdf = await PDFDocument.create();

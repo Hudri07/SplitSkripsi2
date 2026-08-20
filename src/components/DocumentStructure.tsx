@@ -176,6 +176,102 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
     setSelectedIds(new Set());
   };
 
+  const handleMergeSelected = () => {
+    if (selectedIds.size < 2) {
+      alert('Pilih minimal 2 bagian untuk digabungkan menjadi 1 bab utuh.');
+      return;
+    }
+
+    const selectedList = sections.filter((s) => selectedIds.has(s.id));
+    const minStart = Math.min(...selectedList.map((s) => s.start));
+    const maxEnd = Math.max(...selectedList.map((s) => s.end));
+    const primarySection = selectedList[0];
+
+    const confirmMsg = `Gabungkan ${selectedList.length} bagian terpilih menjadi 1 bab utuh (${primarySection.title}, Hal. ${minStart} - ${maxEnd})?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const mergedSection: DocumentSection = {
+      ...primarySection,
+      id: `merged_${Date.now()}`,
+      title: primarySection.title,
+      start: minStart,
+      end: maxEnd,
+      count: maxEnd - minStart + 1,
+      isCustom: true,
+      needsReview: false,
+      snippet: `Digabungkan dari ${selectedList.length} bagian (Hal. ${minStart} - ${maxEnd})`,
+    };
+
+    const newSections: DocumentSection[] = [];
+    let inserted = false;
+
+    for (const sec of sections) {
+      if (selectedIds.has(sec.id)) {
+        if (!inserted) {
+          newSections.push(mergedSection);
+          inserted = true;
+        }
+      } else {
+        newSections.push(sec);
+      }
+    }
+
+    const reordered = newSections
+      .sort((a, b) => a.start - b.start)
+      .map((s, idx) => ({ ...s, order: idx + 1 }));
+
+    onUpdateSections(reordered);
+    setSelectedIds(new Set());
+  };
+
+  const handleAutoConsolidateChapters = () => {
+    // Identify major root sections (Cover, Abstrak, Bab 1-7, Daftar Pustaka, Lampiran)
+    const isMajorHeading = (title: string): boolean => {
+      return /^(?:cover|sampul|abstrak|abstract|kata\s+pengantar|daftar\s+isi|daftar\s+tabel|daftar\s+gambar|bab\s+[ivxlcdm0-9]+|chapter\s+[0-9]+|daftar\s+pustaka|lampiran|riwayat\s+hidup|biodata)/i.test(title.trim());
+    };
+
+    const majorSections = sections.filter((s) => isMajorHeading(s.title));
+    if (majorSections.length <= 1) {
+      alert('Tidak ada pecahan bab yang perlu disatukan.');
+      return;
+    }
+
+    const totalDocPages = metadata.totalUnits || Math.max(...sections.map((s) => s.end));
+    const sortedMajors = [...majorSections].sort((a, b) => a.start - b.start);
+    
+    // Deduplicate same chapter names (keep the earliest start)
+    const uniqueMajors: DocumentSection[] = [];
+    const seenTitles = new Set<string>();
+
+    for (const m of sortedMajors) {
+      const normalized = m.title.trim().toUpperCase();
+      if (!seenTitles.has(normalized)) {
+        seenTitles.add(normalized);
+        uniqueMajors.push(m);
+      }
+    }
+
+    const consolidated: DocumentSection[] = [];
+    for (let i = 0; i < uniqueMajors.length; i++) {
+      const current = uniqueMajors[i];
+      const isLast = i === uniqueMajors.length - 1;
+      const nextStart = isLast ? totalDocPages + 1 : uniqueMajors[i + 1].start;
+      const end = isLast ? totalDocPages : Math.max(current.start, nextStart - 1);
+      const count = Math.max(1, end - current.start + 1);
+
+      consolidated.push({
+        ...current,
+        order: i + 1,
+        start: current.start,
+        end: end,
+        count: count,
+        needsReview: false,
+      });
+    }
+
+    onUpdateSections(consolidated);
+  };
+
   // --- Long Press Handlers for Touch Devices ---
   const handleTouchStart = (id: string) => {
     isLongPressTriggeredRef.current = false;
@@ -364,6 +460,18 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {selectedIds.size >= 2 && (
+                <button
+                  type="button"
+                  onClick={handleMergeSelected}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer transition-colors"
+                  title="Gabungkan bagian-bagian yang dipilih menjadi 1 bab utuh"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Gabungkan ({selectedIds.size})</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleSelectAll}
@@ -409,6 +517,16 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAutoConsolidateChapters}
+              className="px-3.5 py-2 bg-white hover:bg-neutral-100 text-neutral-800 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-neutral-200 shadow-2xs"
+              title="Satukan pecahan-pecahan halaman ke dalam bab utuh secara otomatis"
+            >
+              <Layers className="w-3.5 h-3.5 text-rose-500" />
+              <span>Satukan Bab Utuh</span>
+            </button>
+
             <button
               type="button"
               id="btn-add-section"
