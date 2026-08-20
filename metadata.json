@@ -1,0 +1,6 @@
+{
+  "name": "SplitSkripsi",
+  "description": "Aplikasi web pintar untuk memisahkan dokumen skripsi, tesis, dan laporan akademik PDF berdasarkan struktur bab dan bagian secara otomatis dan aman langsung di browser.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
