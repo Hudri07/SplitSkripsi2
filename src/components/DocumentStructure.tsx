@@ -54,6 +54,8 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [deleteWarningModal, setDeleteWarningModal] = useState<{ title: string; message: string } | null>(null);
 
   // Smart suggestion: track manual deletions and show bulk delete tip if deleted 2 or 3 times
   const [manualDeleteCount, setManualDeleteCount] = useState<number>(0);
@@ -109,7 +111,10 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
 
   const handleDeleteSection = (id: string) => {
     if (sections.length <= 1) {
-      alert('Dokumen minimal harus memiliki 1 bagian.');
+      setDeleteWarningModal({
+        title: 'Tidak Dapat Menghapus Bagian',
+        message: 'Dokumen minimal harus memiliki 1 bagian tersisa agar dapat diproses.',
+      });
       return;
     }
     const updated = sections
@@ -158,22 +163,28 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
     setSelectedIds(new Set());
   };
 
-  const handleBulkDelete = () => {
+  const handleRequestBulkDelete = () => {
     if (selectedIds.size === 0) return;
     if (selectedIds.size >= sections.length) {
-      alert('Tidak dapat menghapus semua bagian. Dokumen minimal harus memiliki 1 bagian tersisa.');
+      setDeleteWarningModal({
+        title: 'Tidak Dapat Menghapus Semua Bagian',
+        message: 'Dokumen minimal harus memiliki 1 bagian tersisa agar dapat dipisahkan menjadi berkas PDF.',
+      });
       return;
     }
 
-    const confirmMsg = `Hapus ${selectedIds.size} bagian terpilih dari dokumen?`;
-    if (!window.confirm(confirmMsg)) return;
+    // Open custom modal dialog
+    setIsBulkDeleteModalOpen(true);
+  };
 
+  const handleConfirmBulkDelete = () => {
     const remaining = sections
       .filter((s) => !selectedIds.has(s.id))
       .map((s, idx) => ({ ...s, order: idx + 1 }));
 
     onUpdateSections(remaining);
     setSelectedIds(new Set());
+    setIsBulkDeleteModalOpen(false);
   };
 
   // --- Long Press Handlers for Touch Devices ---
@@ -382,7 +393,7 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
 
               <button
                 type="button"
-                onClick={handleBulkDelete}
+                onClick={handleRequestBulkDelete}
                 className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -1177,6 +1188,122 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
                 >
                   <CheckSquare className="w-4 h-4" />
                   <span>Coba Hapus Massal Sekarang</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Bulk Delete Confirmation Modal */}
+      <AnimatePresence>
+        {isBulkDeleteModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 14 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-3xl border border-neutral-200 w-full max-w-md shadow-2xl overflow-hidden p-6 sm:p-7 space-y-5 text-neutral-900"
+            >
+              {/* Header */}
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#FF385C] border border-rose-200 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 inline-block mb-1">
+                    Konfirmasi Hapus Massal
+                  </span>
+                  <h3 className="font-bold text-neutral-900 text-base sm:text-lg leading-snug">
+                    Hapus {selectedIds.size} Bagian Terpilih?
+                  </h3>
+                </div>
+              </div>
+
+              {/* List of items to be deleted */}
+              <div className="space-y-2">
+                <p className="text-xs text-neutral-600">
+                  Bagian-bagian berikut akan dihapus dari daftar pemisahan dokumen:
+                </p>
+                <div className="max-h-40 overflow-y-auto airbnb-scrollbar space-y-1.5 p-2 bg-neutral-50 rounded-2xl border border-neutral-200/80">
+                  {sections
+                    .filter((s) => selectedIds.has(s.id))
+                    .map((sec) => (
+                      <div
+                        key={sec.id}
+                        className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-neutral-200/60 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <FileText className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          <span className="font-semibold text-neutral-800 truncate">{sec.title}</span>
+                        </div>
+                        <span className="font-mono text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-md text-[11px] shrink-0">
+                          Hal. {sec.start}-{sec.end}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+                <p className="text-[11px] text-neutral-500 italic">
+                  * Berkas PDF asli Anda tidak akan rusak atau hilang.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteModalOpen(false)}
+                  className="px-5 py-2.5 rounded-full border border-neutral-300 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBulkDelete}
+                  className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full font-bold text-xs shadow-md shadow-rose-600/30 transition-all cursor-pointer inline-flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Hapus ({selectedIds.size})</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Custom Warning Dialog */}
+      <AnimatePresence>
+        {deleteWarningModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 14 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-3xl border border-neutral-200 w-full max-w-md shadow-2xl overflow-hidden p-6 sm:p-7 space-y-4 text-neutral-900"
+            >
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0 shadow-2xs">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-neutral-900 text-base leading-snug">
+                    {deleteWarningModal.title}
+                  </h3>
+                  <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
+                    {deleteWarningModal.message}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => setDeleteWarningModal(null)}
+                  className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-xs rounded-full cursor-pointer transition-colors shadow-xs"
+                >
+                  Mengerti
                 </button>
               </div>
             </motion.div>
