@@ -79,12 +79,14 @@ export async function splitPdfDocument(
 }
 
 /**
- * Helper to generate filesystem-safe filenames
+ * Helper to generate filesystem-safe filenames without redundant hyphens or awkward _-_ combinations
  */
 export function sanitizeFileName(name: string): string {
   return name
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/\s+/g, '_')
+    // Replace hyphens, dashes, slashes, colons, punctuation, symbols and whitespace with underscore
+    .replace(/[\s\-_–—:;.,/\\*?"<>|&()\[\]{}'"`!@#$%^+=]+/g, '_')
+    // Collapse any multiple consecutive underscores into a single underscore
     .replace(/_{2,}/g, '_')
+    // Strip leading and trailing underscores
     .replace(/^_+|_+$/g, '');
 }
