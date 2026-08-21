@@ -7,7 +7,8 @@ interface CandidatePoint {
   normalizedKey: string;
   category: 'frontmatter' | 'chapter' | 'backmatter' | 'other';
   chapterNumber?: number | null;
-  start: number; // 1-based page or 0-based para
+  start: number; // 1-based page for PDF, 0-based para for DOCX
+  end?: number;
   confidence: number;
   snippet?: string;
   notes?: string[];
@@ -46,6 +47,237 @@ export function extractChapterNumber(key: string, titleOrLine: string): number |
 }
 
 /**
+ * Helper to check if a line is a clean standalone heading
+ */
+function isStandaloneHeadingLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length > 70) return false;
+  // If line starts with list numbers (e.g. 1. Bapak, 2. Ibu, a., -, •) it's body text/list, not a heading
+  if (/^(?:\d+[\.\)]|[a-zA-Z][\.\)]|[-•*]|\(\d+\))\s+/i.test(trimmed)) return false;
+  // If line ends with comma or semicolon, it's mid-sentence
+  if (/[,;]$/.test(trimmed)) return false;
+  return true;
+}
+
+/**
+ * Analyze an unlabelled frontmatter page by its text content to classify it accurately
+ */
+function classifyFrontmatterPage(page: ExtractedPage): { key: string; title: string; confidence: number } | null {
+  const text = page.text.toLowerCase();
+  
+  // Find the top clean heading line (usually line 0 or 1)
+  const topNonEmptyLines = page.lines.map(l => l.trim()).filter(l => l.length > 0).slice(0, 3);
+  const headerCandidate = topNonEmptyLines.find(isStandaloneHeadingLine) || '';
+  const headerLower = headerCandidate.toLowerCase();
+
+  // 1. Check Publication Approval first (standalone heading or explicit header text)
+  if (
+    /^(?:halaman\s+|lembar\s+|surat\s+)?(?:pernyataan\s+)?persetujuan\s+publikasi/i.test(headerLower) ||
+    /persetujuan\s+publikasi\s+(?:karya\s+ilmiah|skripsi|tugas\s+akhir)/i.test(headerLower)
+  ) {
+    return {
+      key: 'publication_approval',
+      title: 'Halaman Persetujuan Publikasi',
+      confidence: 95,
+    };
+  }
+
+  // 2. Motto & Dedication standalone header checks
+  if (/^(?:halaman\s+|lembar\s+)?(?:motto\s+dan\s+persembahan|persembahan\s+dan\s+motto)$/i.test(headerLower)) {
+    return {
+      key: 'dedication_motto',
+      title: 'Halaman Motto & Persembahan',
+      confidence: 95,
+    };
+  }
+
+  if (/^(?:halaman\s+|lembar\s+)?(?:motto|semboyan)$/i.test(headerLower)) {
+    return {
+      key: 'motto',
+      title: 'Halaman Motto',
+      confidence: 95,
+    };
+  }
+
+  if (/^(?:halaman\s+|lembar\s+)?(?:persembahan|dedikasi|dedication)$/i.test(headerLower)) {
+    return {
+      key: 'dedication',
+      title: 'Halaman Persembahan',
+      confidence: 95,
+    };
+  }
+
+  // 3. Lembar Persetujuan (Pembimbing / Proposal) vs Lembar Pengesahan (Tim Penguji / Dekan)
+  if (
+    /^(?:lembar(?:an)?\s+|halaman\s+|tanda\s+)?pengesahan(?:\s+skripsi|\s+tugas\s+akhir|\s+tesis|\s+penguji|\s+tim\s+penguji|\s+dewan\s+penguji|\s+laporan)?$/i.test(headerLower) ||
+    /^(?:lembar\s+|halaman\s+)?pengesahan\s+(?:tim\s+penguji|dewan\s+penguji|panitia\s+ujian|dekan)$/i.test(headerLower) ||
+    /^approval\s+sheet$/i.test(headerLower)
+  ) {
+    return {
+      key: 'approval_examiner',
+      title: /halaman/i.test(headerLower) ? 'Halaman Pengesahan' : 'Lembar Pengesahan',
+      confidence: 95,
+    };
+  }
+
+  if (
+    /^(?:lembar(?:an)?\s+|halaman\s+|surat\s+|tanda\s+)?persetujuan(?:\s+skripsi|\s+tugas\s+akhir|\s+tesis|\s+pembimbing|\s+komisi\s+pembimbing|\s+dosen\s+pembimbing|\s+seminar|\s+ujian|\s+naskah)?$/i.test(headerLower) ||
+    /^(?:lembar\s+|halaman\s+)?persetujuan\s+(?:pembimbing|dosen\s+pembimbing|komisi\s+pembimbing)$/i.test(headerLower) ||
+    /^persetujuan\s+pembimbing$/i.test(headerLower)
+  ) {
+    return {
+      key: 'approval_advisor',
+      title: /halaman/i.test(headerLower) ? 'Halaman Persetujuan' : 'Lembar Persetujuan',
+      confidence: 95,
+    };
+  }
+
+  // 4. Pernyataan Keaslian
+  if (/^(?:pernyataan\s+|surat\s+pernyataan\s+)?(?:keaslian|orisinalitas|bebas\s+plagiat|bebas\s+plagiarisme)(?:\s+skripsi|\s+karya\s+ilmiah)?$/i.test(headerLower) ||
+      /^statement\s+of\s+originality$/i.test(headerLower)) {
+    return {
+      key: 'declaration',
+      title: 'Pernyataan Keaslian',
+      confidence: 95,
+    };
+  }
+
+  // 5. Kata Pengantar
+  if (/^(?:kata\s+pengantar|prakata|foreword|preface)$/i.test(headerLower)) {
+    return {
+      key: 'preface',
+      title: 'Kata Pengantar',
+      confidence: 95,
+    };
+  }
+
+  // 6. Daftar Isi
+  if (/^(?:daftar\s+isi|table\s+of\s+contents?)$/i.test(headerLower)) {
+    return {
+      key: 'toc',
+      title: 'Daftar Isi',
+      confidence: 95,
+    };
+  }
+
+  // 7. Daftar Tabel
+  if (/^(?:daftar\s+tabel|list\s+of\s+tables?)$/i.test(headerLower)) {
+    return {
+      key: 'table_list',
+      title: 'Daftar Tabel',
+      confidence: 95,
+    };
+  }
+
+  // 8. Daftar Gambar
+  if (/^(?:daftar\s+(?:gambar|grafik|bagan|diagram|peta)|list\s+of\s+figures?)$/i.test(headerLower)) {
+    return {
+      key: 'figure_list',
+      title: 'Daftar Gambar',
+      confidence: 95,
+    };
+  }
+
+  // 9. Daftar Lampiran
+  if (/^(?:daftar\s+lampiran|list\s+of\s+appendi(?:ces|x))$/i.test(headerLower)) {
+    return {
+      key: 'appendix_list',
+      title: 'Daftar Lampiran',
+      confidence: 95,
+    };
+  }
+
+  // 10. Daftar Singkatan & Simbol
+  if (/^(?:daftar\s+(?:singkatan|simbol|lambang|notasi|istilah))$/i.test(headerLower)) {
+    return {
+      key: 'abbreviation_list',
+      title: 'Daftar Singkatan & Simbol',
+      confidence: 95,
+    };
+  }
+
+  // 11. Abstrak
+  if (/^abstract$/i.test(headerLower)) {
+    return {
+      key: 'abstract_en',
+      title: 'Abstract',
+      confidence: 95,
+    };
+  }
+
+  if (/^(?:abstrak|ringkasan)$/i.test(headerLower)) {
+    return {
+      key: 'abstract_id',
+      title: 'Abstrak',
+      confidence: 95,
+    };
+  }
+
+  // Check if this page has multiple ToC lines (dotted leaders or structured index)
+  let tocLinesCount = 0;
+  for (const l of page.lines) {
+    if (isLikelyTocLine(l)) tocLinesCount++;
+  }
+  if (tocLinesCount >= 3) {
+    const top2 = topNonEmptyLines.join(' ').toLowerCase();
+    if (top2.includes('tabel')) {
+      return { key: 'table_list', title: 'Daftar Tabel', confidence: 90 };
+    }
+    if (top2.includes('gambar') || top2.includes('bagan') || top2.includes('grafik')) {
+      return { key: 'figure_list', title: 'Daftar Gambar', confidence: 90 };
+    }
+    if (top2.includes('lampiran')) {
+      return { key: 'appendix_list', title: 'Daftar Lampiran', confidence: 90 };
+    }
+    return {
+      key: 'toc',
+      title: 'Daftar Isi',
+      confidence: 85,
+    };
+  }
+
+  // Deep Motto text search (ONLY for short quotes/verses if page has minimal lines and not a long text)
+  if (page.lines.length <= 15) {
+    if (
+      /\b(q\.s\.|surah|al-baqarah|al-insyirah|ar-rahman|al-imran|hadits|hadis|man\s+jadda\s+wajada)\b/i.test(text) ||
+      ((/(\"|\“)[^\"]{15,}(\"|\”)/.test(page.text)) && (text.includes('sesungguhnya') || text.includes('kegagalan') || text.includes('kesuksesan') || text.includes('bermimpilah')))
+    ) {
+      return {
+        key: 'motto',
+        title: 'Halaman Motto',
+        confidence: 90,
+      };
+    }
+  }
+
+  // Deep Persembahan search (ONLY for dedicated persembahan page with few lines)
+  if (page.lines.length <= 15) {
+    if (
+      text.includes('kupersembahkan') ||
+      (text.includes('persembahan') && (text.includes('ayah') || text.includes('ibu') || text.includes('orang tua') || text.includes('keluarga'))) ||
+      (text.includes('teruntuk') && (text.includes('ayah') || text.includes('ibu') || text.includes('keluarga')))
+    ) {
+      return {
+        key: 'dedication',
+        title: 'Halaman Persembahan',
+        confidence: 90,
+      };
+    }
+  }
+
+  // Page 2 title page check
+  if (page.pageNumber === 2 && (text.includes('diajukan untuk') || (text.includes('program studi') && text.includes('fakultas') && text.includes('nim')))) {
+    return {
+      key: 'title_page',
+      title: 'Halaman Judul',
+      confidence: 85,
+    };
+  }
+
+  return null;
+}
+
+/**
  * Detect sections from extracted PDF pages with strict Academic Pipeline & Contiguous Chapter Spanning
  */
 export function detectPdfStructure(pages: ExtractedPage[]): {
@@ -55,7 +287,7 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
   const totalPages = pages.length;
   if (totalPages === 0) return { sections: [], detectedTocPages: [] };
 
-  // Step 1: Identify all Table of Contents pages first
+  // Step 1: Identify all Table of Contents pages
   const detectedTocPages: number[] = [];
   pages.forEach((page) => {
     const firstFewLines = page.lines.slice(0, 5).join(' ');
@@ -65,13 +297,14 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
   });
 
   const tocPageSet = new Set(detectedTocPages);
+
+  // Step 2: Find all raw candidates across the entire document
   const rawCandidates: CandidatePoint[] = [];
 
-  // Step 2: Scan pages for academic section headers
   pages.forEach((page) => {
     const isTocPage = tocPageSet.has(page.pageNumber);
 
-    // Count how many chapter patterns exist on this page (if >= 2, likely a ToC or summary)
+    // Count how many chapter patterns exist on this page (if >= 2, likely a ToC)
     let chapterMatchesOnPage = 0;
     page.lines.forEach((line) => {
       if (/^bab\s+(?:i|ii|iii|iv|v|vi|vii|[0-9]+)\b/i.test(line.trim())) {
@@ -79,18 +312,24 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
       }
     });
 
-    // Check prominent top lines (indices 0 to 5)
-    for (let lineIdx = 0; lineIdx < Math.min(page.lines.length, 6); lineIdx++) {
+    // Check prominent top lines (indices 0 to 4)
+    for (let lineIdx = 0; lineIdx < Math.min(page.lines.length, 5); lineIdx++) {
       const line = page.lines[lineIdx].trim();
       if (!line) continue;
-
-      // Reject if line looks like body text paragraph
       if (line.length > 110) continue;
 
-      // Check against academic patterns
       for (const pattern of ACADEMIC_PATTERNS) {
-        let isMatch = false;
+        // Enforce Cover only on page 1
+        if (page.pageNumber > 1 && pattern.key === 'cover') {
+          continue;
+        }
 
+        // Frontmatter headings must be clean standalone lines in the top 3 lines
+        if (pattern.category === 'frontmatter' && (lineIdx > 2 || !isStandaloneHeadingLine(line))) {
+          continue;
+        }
+
+        let isMatch = false;
         for (const regex of pattern.regexList) {
           if (regex.test(line)) {
             isMatch = true;
@@ -99,7 +338,6 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
         }
 
         if (isMatch) {
-          // If this is a BAB, check if the next line is the subtitle (e.g. BAB I \n PENDAHULUAN)
           let fullHeading = line;
           if (pattern.category === 'chapter' && lineIdx + 1 < page.lines.length) {
             const nextLine = page.lines[lineIdx + 1].trim();
@@ -121,12 +359,10 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
 
           const result = calculateConfidence(pattern, fullHeading, ctx);
 
-          // Only accept if not a ToC line and confidence is high enough
           if (!result.isToc && result.confidence >= 50) {
             const formattedTitle = formatSectionTitle(fullHeading, pattern.defaultTitle, pattern.key);
             const chapNum = pattern.category === 'chapter' ? extractChapterNumber(pattern.key, line) : null;
 
-            // Avoid duplicate pattern candidate on the exact same page
             const existingOnSamePage = rawCandidates.find((c) => c.start === page.pageNumber);
             if (!existingOnSamePage || result.confidence > existingOnSamePage.confidence) {
               if (existingOnSamePage) {
@@ -153,53 +389,271 @@ export function detectPdfStructure(pages: ExtractedPage[]): {
     }
   });
 
-  // Step 3: Apply Academic State Machine & Contiguous Chapter Pipeline
-  // Sort raw candidates by page order
+  // Step 3: Find first chapter start page (BAB I / Chapter 1)
   rawCandidates.sort((a, b) => a.start - b.start);
 
-  const filteredCandidates: CandidatePoint[] = [];
+  const firstChapterCandidate = rawCandidates.find((c) => c.category === 'chapter' && (c.chapterNumber === 1 || c.normalizedKey === 'bab_1'));
+  const firstChapterPage = firstChapterCandidate ? firstChapterCandidate.start : (rawCandidates.find(c => c.category === 'chapter')?.start ?? totalPages + 1);
+
+  // Step 4: Build Frontmatter Sections (Pages 1 to firstChapterPage - 1)
+  const frontmatterSections: DocumentSection[] = [];
+
+  // 1. Page 1 is ALWAYS Cover Skripsi (strictly page 1 - 1)
+  frontmatterSections.push({
+    id: 'sec_cover',
+    order: 1,
+    title: 'Cover Skripsi',
+    normalizedKey: 'cover',
+    start: 1,
+    end: 1,
+    count: 1,
+    confidence: 99,
+    needsReview: false,
+    snippet: pages[0]?.lines.slice(0, 3).join(' ').substring(0, 120) || 'Halaman Depan / Cover Skripsi',
+  });
+
+  // 2. Scan each subsequent page in the frontmatter zone (from page 2 up to firstChapterPage - 1)
+  for (let pNum = 2; pNum < firstChapterPage; pNum++) {
+    const pageObj = pages[pNum - 1];
+    if (!pageObj) continue;
+
+    const prevSec = frontmatterSections[frontmatterSections.length - 1];
+
+    // Check if this page has explicit candidate from rawCandidates
+    const explicitCandidate = rawCandidates.find((c) => c.start === pNum && c.category === 'frontmatter');
+
+    // Count ToC dotted lines on this page
+    let tocLinesCount = 0;
+    for (const l of pageObj.lines) {
+      if (isLikelyTocLine(l)) tocLinesCount++;
+    }
+
+    const firstLineTrimmed = pageObj.lines[0]?.trim().toLowerCase() || '';
+    const isContinuationHeader = /^\(?(?:lanjutan|sambungan|continued)\)?/i.test(firstLineTrimmed) ||
+      /daftar\s+isi\s*\(?lanjutan\)?/i.test(firstLineTrimmed) ||
+      /daftar\s+tabel\s*\(?lanjutan\)?/i.test(firstLineTrimmed) ||
+      /daftar\s+gambar\s*\(?lanjutan\)?/i.test(firstLineTrimmed);
+
+    // 1. Identify section heading on this page (explicit candidate from pattern match or semantic classification)
+    let sectionTitle = '';
+    let sectionKey = '';
+    let confidence = 85;
+
+    if (explicitCandidate) {
+      sectionTitle = explicitCandidate.title;
+      sectionKey = explicitCandidate.normalizedKey;
+      confidence = explicitCandidate.confidence;
+    } else {
+      // Perform semantic classification on this frontmatter page
+      const classification = classifyFrontmatterPage(pageObj);
+      if (classification) {
+        sectionTitle = classification.title;
+        sectionKey = classification.key;
+        confidence = classification.confidence;
+      }
+    }
+
+    // 2. Check if this page matches a recognized frontmatter section
+    if (sectionKey) {
+      // If it's the SAME section key as previous section (e.g. Kata Pengantar page 2/3 or Daftar Isi page 2)
+      if (prevSec && prevSec.normalizedKey === sectionKey && prevSec.normalizedKey !== 'cover' && prevSec.end === pNum - 1) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+
+      // Academic sequence protection for Kata Pengantar (Preface):
+      // Sections like Lembar Pengesahan, Persetujuan, Motto, Persembahan, Keaslian come BEFORE Kata Pengantar.
+      // If Kata Pengantar is active, body mentions of these terms must NOT break Kata Pengantar into a new card.
+      if (prevSec && prevSec.normalizedKey === 'preface' && prevSec.end === pNum - 1) {
+        const validSuccessorsAfterPreface = new Set([
+          'toc', 'table_list', 'figure_list', 'appendix_list', 'abbreviation_list'
+        ]);
+
+        if (!validSuccessorsAfterPreface.has(sectionKey)) {
+          prevSec.end = pNum;
+          prevSec.count = prevSec.end - prevSec.start + 1;
+          continue;
+        }
+      }
+
+      // If it's a genuine NEW distinct section (e.g. Daftar Isi, Daftar Tabel, Daftar Gambar, Lembar Pengesahan)
+      frontmatterSections.push({
+        id: `sec_fm_${pNum}_${sectionKey}`,
+        order: frontmatterSections.length + 1,
+        title: sectionTitle,
+        normalizedKey: sectionKey,
+        start: pNum,
+        end: pNum,
+        count: 1,
+        confidence: confidence,
+        needsReview: confidence < 75,
+        snippet: pageObj.lines.slice(0, 3).join(' ').substring(0, 120),
+      });
+      continue;
+    }
+
+    // 3. If NO new section heading was detected on this page, check if it is a CONTINUATION of the previous section
+    if (prevSec && prevSec.end === pNum - 1) {
+      // Continuation of Daftar Isi
+      if (prevSec.normalizedKey === 'toc' && (tocLinesCount >= 1 || isContinuationHeader)) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+
+      // Continuation of Daftar Tabel
+      if (prevSec.normalizedKey === 'table_list' && (isContinuationHeader || /tabel/i.test(pageObj.text) || tocLinesCount >= 1)) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+
+      // Continuation of Daftar Gambar
+      if (prevSec.normalizedKey === 'figure_list' && (isContinuationHeader || /gambar/i.test(pageObj.text) || tocLinesCount >= 1)) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+
+      // Continuation of Daftar Lampiran
+      if (prevSec.normalizedKey === 'appendix_list' && (isContinuationHeader || /lampiran/i.test(pageObj.text) || tocLinesCount >= 1)) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+
+      // Continuation of multi-page Kata Pengantar (Preface)
+      if (prevSec.normalizedKey === 'preface' && tocLinesCount === 0) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+
+      // Continuation of multi-page Abstract
+      if ((prevSec.normalizedKey === 'abstract_id' || prevSec.normalizedKey === 'abstract_en') && prevSec.count < 2 && pageObj.text.trim().length > 50 && tocLinesCount === 0) {
+        prevSec.end = pNum;
+        prevSec.count = prevSec.end - prevSec.start + 1;
+        continue;
+      }
+    }
+
+    // 4. Fallback: Smart structural inference based on page context (discrete 1-page section)
+    let fallbackTitle = 'Halaman Pelengkap Depan';
+    let fallbackKey = 'preliminary';
+
+    if (pNum === 2) {
+      fallbackTitle = 'Halaman Judul';
+      fallbackKey = 'title_page';
+    } else if (pageObj.text.toLowerCase().includes('motto') || pageObj.text.toLowerCase().includes('quote') || pageObj.text.toLowerCase().includes('semboyan')) {
+      fallbackTitle = 'Halaman Motto';
+      fallbackKey = 'motto';
+    } else if (pageObj.text.toLowerCase().includes('persembahan') || pageObj.text.toLowerCase().includes('kupersembahkan')) {
+      fallbackTitle = 'Halaman Persembahan';
+      fallbackKey = 'dedication';
+    } else if (pageObj.text.toLowerCase().includes('publikasi')) {
+      fallbackTitle = 'Halaman Persetujuan Publikasi';
+      fallbackKey = 'publication_approval';
+    } else if (pageObj.text.toLowerCase().includes('pengesahan') || pageObj.text.toLowerCase().includes('tim penguji')) {
+      fallbackTitle = 'Lembar Pengesahan';
+      fallbackKey = 'approval_examiner';
+    } else if (pageObj.text.toLowerCase().includes('persetujuan') || pageObj.text.toLowerCase().includes('pembimbing')) {
+      fallbackTitle = 'Lembar Persetujuan';
+      fallbackKey = 'approval_advisor';
+    } else if (pageObj.text.toLowerCase().includes('keaslian') || pageObj.text.toLowerCase().includes('plagiat')) {
+      fallbackTitle = 'Pernyataan Keaslian';
+      fallbackKey = 'declaration';
+    }
+
+    frontmatterSections.push({
+      id: `sec_fm_${pNum}_${fallbackKey}`,
+      order: frontmatterSections.length + 1,
+      title: fallbackTitle,
+      normalizedKey: fallbackKey,
+      start: pNum,
+      end: pNum,
+      count: 1,
+      confidence: 70,
+      needsReview: true,
+      snippet: pageObj.lines.slice(0, 3).join(' ').substring(0, 120),
+    });
+  }
+
+  // Step 5: Process Chapter and Backmatter Candidates
+  const bodyCandidates: CandidatePoint[] = [];
   let currentChapterNumber = 0;
   let hasEncounteredFirstChapter = false;
 
   for (const cand of rawCandidates) {
-    // 1. FRONTMATTER CANDIDATES:
-    // Once BAB I has started, reject any frontmatter patterns (e.g. Cover, Kata Pengantar, Daftar Tabel inside Bab IV)
-    if (cand.category === 'frontmatter') {
-      if (hasEncounteredFirstChapter) {
-        // Discard frontmatter noise inside main thesis chapters
-        continue;
-      }
-      filteredCandidates.push(cand);
+    if (cand.start < firstChapterPage) {
+      // Already processed in frontmatter
       continue;
     }
 
-    // 2. CHAPTER CANDIDATES:
     if (cand.category === 'chapter') {
       const cNum = cand.chapterNumber ?? (currentChapterNumber + 1);
-
-      // If chapter number is less than or equal to current active chapter (e.g. running header repeating "BAB IV"),
-      // do NOT create duplicate / fragmented cards!
       if (hasEncounteredFirstChapter && cNum <= currentChapterNumber) {
         continue;
       }
-
-      // Valid new chapter progression (e.g. BAB 1 -> BAB 2 -> BAB 3 -> BAB 4 -> BAB 5)
       hasEncounteredFirstChapter = true;
       currentChapterNumber = cNum;
-      filteredCandidates.push(cand);
+      bodyCandidates.push(cand);
       continue;
     }
 
-    // 3. BACKMATTER CANDIDATES (Daftar Pustaka, Lampiran, Riwayat Hidup):
     if (cand.category === 'backmatter') {
-      // Backmatter is accepted once chapters are done or after page 10
-      filteredCandidates.push(cand);
+      bodyCandidates.push(cand);
     }
   }
 
-  // Step 4: Build non-overlapping contiguous sections (e.g., BAB IV 40-77, BAB V 78-85)
-  const sections = buildContiguousSections(filteredCandidates, totalPages, 1);
-  return { sections, detectedTocPages };
+  // Step 6: Build Contiguous Chapter and Backmatter Sections
+  const bodySections: DocumentSection[] = [];
+
+  for (let i = 0; i < bodyCandidates.length; i++) {
+    const cand = bodyCandidates[i];
+    const isLast = i === bodyCandidates.length - 1;
+    const nextStart = isLast ? totalPages + 1 : bodyCandidates[i + 1].start;
+    const end = isLast ? totalPages : Math.max(cand.start, nextStart - 1);
+    const count = Math.max(1, end - cand.start + 1);
+
+    bodySections.push({
+      id: `sec_body_${cand.start}_${cand.normalizedKey}`,
+      order: 0, // will be re-numbered
+      title: cand.title,
+      normalizedKey: cand.normalizedKey,
+      start: cand.start,
+      end: end,
+      count: count,
+      confidence: cand.confidence,
+      needsReview: cand.needsReview,
+      snippet: cand.snippet,
+      notes: cand.notes?.join(' • '),
+    });
+  }
+
+  // Combine Frontmatter + Body Sections and assign clean sequential orders (1, 2, 3...)
+  const allSections: DocumentSection[] = [...frontmatterSections, ...bodySections].map((sec, idx) => ({
+    ...sec,
+    order: idx + 1,
+  }));
+
+  // Fallback if entire document is single unit
+  if (allSections.length === 0) {
+    allSections.push({
+      id: 'sec_1',
+      order: 1,
+      title: 'Cover Skripsi',
+      normalizedKey: 'cover',
+      start: 1,
+      end: totalPages,
+      count: totalPages,
+      confidence: 50,
+      needsReview: true,
+      snippet: 'Seluruh Dokumen',
+    });
+  }
+
+  return { sections: allSections, detectedTocPages };
 }
 
 /**
@@ -239,7 +693,6 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
       if (isMatch) {
         let fullHeading = text;
 
-        // Check if next paragraph is subtitle
         if (pattern.category === 'chapter' && p.index + 1 < paragraphs.length) {
           const nextP = paragraphs[p.index + 1];
           const nextText = nextP.text.trim();
@@ -270,7 +723,6 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
           const formattedTitle = formatSectionTitle(fullHeading, pattern.defaultTitle, pattern.key);
           const chapNum = pattern.category === 'chapter' ? extractChapterNumber(pattern.key, text) : null;
 
-          // Avoid duplicate nearby candidates (within 2 paragraphs)
           const isDuplicate = rawCandidates.some((c) => Math.abs(c.start - p.index) <= 2 && c.normalizedKey === pattern.key);
 
           if (!isDuplicate) {
@@ -292,8 +744,9 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
     }
   });
 
-  // Step 3: Filter candidates
+  // Step 3: Sort candidates
   rawCandidates.sort((a, b) => a.start - b.start);
+
   const filteredCandidates: CandidatePoint[] = [];
   let currentChapterNumber = 0;
   let hasEncounteredFirstChapter = false;
@@ -318,68 +771,34 @@ export function detectDocxStructure(paragraphs: ExtractedParagraph[]): {
   }
 
   // Step 4: Build sections
-  const sections = buildContiguousSections(filteredCandidates, totalParagraphs - 1, 0);
-  return { sections, detectedTocIndexes };
-}
-
-/**
- * Helper to build ordered, contiguous start-end ranges (e.g. BAB 4 spans until BAB 5 starts - 1)
- */
-function buildContiguousSections(
-  candidates: CandidatePoint[],
-  totalUnits: number,
-  baseUnit: number // 1 for PDF (pages), 0 for DOCX (paragraphs)
-): DocumentSection[] {
-  // Sort candidates by start ascending
-  const sorted = [...candidates].sort((a, b) => a.start - b.start);
   const result: DocumentSection[] = [];
+  const maxIdx = totalParagraphs - 1;
 
-  // If there are no candidates at all, create a single fallback section
-  if (sorted.length === 0) {
-    return [
-      {
-        id: 'sec_1',
-        order: 1,
-        title: 'Seluruh Dokumen',
-        normalizedKey: 'full_document',
-        start: baseUnit,
-        end: totalUnits,
-        count: totalUnits - baseUnit + 1,
-        confidence: 50,
-        needsReview: true,
-        snippet: 'Tidak ditemukan penanda bab otomatis.',
-      },
-    ];
-  }
-
-  // If first detected candidate is not at the beginning (e.g. Abstrak on page 3 or BAB I on page 12),
-  // insert Cover / Halaman Awal as the first section!
-  if (sorted[0].start > baseUnit) {
-    const coverEnd = sorted[0].start - 1;
+  if (filteredCandidates.length === 0 || filteredCandidates[0].start > 0) {
+    const firstCandStart = filteredCandidates.length > 0 ? filteredCandidates[0].start : maxIdx + 1;
     result.push({
       id: 'sec_cover',
       order: 1,
-      title: 'Cover / Halaman Depan',
+      title: 'Cover Skripsi',
       normalizedKey: 'cover',
-      start: baseUnit,
-      end: coverEnd,
-      count: coverEnd - baseUnit + 1,
+      start: 0,
+      end: Math.max(0, firstCandStart - 1),
+      count: Math.max(1, firstCandStart),
       confidence: 99,
       needsReview: false,
-      snippet: 'Bagian awal dokumen sebelum bab/bagian pertama.',
+      snippet: 'Bagian Awal Dokumen / Cover Skripsi',
     });
   }
 
-  // Add detected candidates with contiguous range spanning
-  for (let i = 0; i < sorted.length; i++) {
-    const cand = sorted[i];
-    const isLast = i === sorted.length - 1;
-    const nextStart = isLast ? totalUnits + 1 : sorted[i + 1].start;
-    const end = isLast ? totalUnits : Math.max(cand.start, nextStart - 1);
+  for (let i = 0; i < filteredCandidates.length; i++) {
+    const cand = filteredCandidates[i];
+    const isLast = i === filteredCandidates.length - 1;
+    const nextStart = isLast ? maxIdx + 1 : filteredCandidates[i + 1].start;
+    const end = isLast ? maxIdx : Math.max(cand.start, nextStart - 1);
     const count = Math.max(1, end - cand.start + 1);
 
     result.push({
-      id: `sec_${i + 1}_${cand.normalizedKey}`,
+      id: `sec_docx_${i + 1}_${cand.normalizedKey}`,
       order: result.length + 1,
       title: cand.title,
       normalizedKey: cand.normalizedKey,
@@ -393,9 +812,5 @@ function buildContiguousSections(
     });
   }
 
-  // Re-number orders sequentially
-  return result.map((s, idx) => ({
-    ...s,
-    order: idx + 1,
-  }));
+  return { sections: result.map((s, idx) => ({ ...s, order: idx + 1 })), detectedTocIndexes };
 }

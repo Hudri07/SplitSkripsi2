@@ -1,8 +1,8 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 /**
- * Generates a realistic sample Academic Thesis PDF (12 pages)
- * Includes Cover, Pengesahan, Abstrak, Kata Pengantar, Daftar Isi (with dots), BAB I - BAB V, Daftar Pustaka, Lampiran
+ * Generates a realistic sample Academic Thesis PDF (15 pages)
+ * Includes Cover, Pengesahan, Pernyataan Keaslian, Persembahan, Abstrak, Kata Pengantar, Daftar Isi, Daftar Gambar, BAB I - BAB V, Daftar Pustaka, Lampiran
  */
 export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; filename: string }> {
   const pdfDoc = await PDFDocument.create();
@@ -18,7 +18,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
   }
 
   const samplePages: PageTemplate[] = [
-    // 1: Cover
+    // 1: Cover Skripsi
     {
       header: 'SKRIPSI',
       subHeader: 'SISTEM DETEKSI DAN PEMISAHAN DOKUMEN AKADEMIK OTOMATIS BERBASIS WEB',
@@ -70,7 +70,22 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Rahmad Hidayat',
       ],
     },
-    // 4: Abstrak
+    // 4: Halaman Persembahan
+    {
+      header: 'HALAMAN PERSEMBAHAN',
+      subHeader: 'MOTTO DAN PERSEMBAHAN',
+      bodyLines: [
+        '"Bermimpilah setinggi langit. Jika engkau jatuh, engkau akan jatuh di antara bintang-bintang."',
+        '- Ir. Soekarno',
+        '',
+        'Kupersembahkan karya sederhana ini untuk:',
+        '1. Ayahanda dan Ibunda tercinta yang tak pernah lelah melangitkan doa dan mencurahkan kasih sayang.',
+        '2. Saudara-saudara dan keluarga besar atas dukungan moral tanpa henti.',
+        '3. Sahabat-sahabat seperjuangan Teknik Informatika Angkatan 2022.',
+        '4. Almamater tercinta Universitas Indonesia Jaya.',
+      ],
+    },
+    // 5: Abstrak
     {
       header: 'ABSTRAK',
       subHeader: 'SISTEM DETEKSI DAN PEMISAHAN DOKUMEN AKADEMIK OTOMATIS BERBASIS WEB',
@@ -85,7 +100,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Kata Kunci: Pemisah Dokumen, Skripsi Digital, Heuristic Detection, Privacy-first.',
       ],
     },
-    // 5: Kata Pengantar
+    // 6: Kata Pengantar
     {
       header: 'KATA PENGANTAR',
       bodyLines: [
@@ -102,7 +117,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Penulis',
       ],
     },
-    // 6: Daftar Isi (Contains dotted lines which must NOT trigger false positives)
+    // 7: Daftar Isi (Contains dotted lines which must NOT trigger false positives)
     {
       header: 'DAFTAR ISI',
       isToc: true,
@@ -110,10 +125,11 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'HALAMAN JUDUL ............................................................................ i',
         'LEMBAR PENGESAHAN ........................................................................ ii',
         'PERNYATAAN KEASLIAN ..................................................................... iii',
-        'ABSTRAK .................................................................................. iv',
-        'KATA PENGANTAR ........................................................................... v',
-        'DAFTAR ISI ............................................................................... vi',
-        'DAFTAR GAMBAR ............................................................................ vii',
+        'HALAMAN PERSEMBAHAN ..................................................................... iv',
+        'ABSTRAK .................................................................................. v',
+        'KATA PENGANTAR ........................................................................... vi',
+        'DAFTAR ISI ............................................................................... vii',
+        'DAFTAR GAMBAR ............................................................................ viii',
         'BAB I PENDAHULUAN ........................................................................ 1',
         '   1.1 Latar Belakang Masalah ............................................................ 1',
         '   1.2 Rumusan Masalah .................................................................. 2',
@@ -135,7 +151,17 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'LAMPIRAN ................................................................................. 12',
       ],
     },
-    // 7: BAB I
+    // 8: Daftar Gambar
+    {
+      header: 'DAFTAR GAMBAR',
+      bodyLines: [
+        'Gambar 1.1 Diagram Alir Deteksi Struktur Dokumen ......................................... 3',
+        'Gambar 2.1 Struktur Objek Internal File Format PDF ....................................... 5',
+        'Gambar 3.1 Arsitektur Client-Side Web Processing ......................................... 7',
+        'Gambar 4.1 Tampilan Antarmuka Pratinjau Pemotongan Bab ................................... 9',
+      ],
+    },
+    // 9: BAB I
     {
       header: 'BAB I',
       subHeader: 'PENDAHULUAN',
@@ -152,7 +178,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Menghasilkan instrumen aplikasi pemisah dokumen yang aman, cepat, dan presisi tinggi.',
       ],
     },
-    // 8: BAB II
+    // 10: BAB II
     {
       header: 'BAB II',
       subHeader: 'TINJAUAN PUSTAKA',
@@ -165,7 +191,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'terjadi pemotongan palsu (false-positive).',
       ],
     },
-    // 9: BAB III
+    // 11: BAB III
     {
       header: 'BAB III',
       subHeader: 'METODOLOGI PENELITIAN',
@@ -177,7 +203,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Seluruh pemrosesan berlangsung di sisi peramban (client-side) menggunakan Web Worker dan PDF-Lib.',
       ],
     },
-    // 10: BAB IV
+    // 12: BAB IV
     {
       header: 'BAB IV',
       subHeader: 'HASIL DAN PEMBAHASAN',
@@ -189,7 +215,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Rata-rata waktu pemrosesan dokumen 100 halaman adalah kurang dari 2 detik di browser modern.',
       ],
     },
-    // 11: BAB V
+    // 13: BAB V
     {
       header: 'BAB V',
       subHeader: 'KESIMPULAN DAN SARAN',
@@ -201,7 +227,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         'Pengembangan lebih lanjut dapat menambahkan integrasi langsung dengan API E-Prints institusi.',
       ],
     },
-    // 12: DAFTAR PUSTAKA
+    // 14: DAFTAR PUSTAKA
     {
       header: 'DAFTAR PUSTAKA',
       bodyLines: [
@@ -211,7 +237,7 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
         '4. Rahardjo, Budi. (2023). Keamanan Informasi dan Manajemen Dokumen Digital. Bandung: ITB Press.',
       ],
     },
-    // 13: LAMPIRAN
+    // 15: LAMPIRAN
     {
       header: 'LAMPIRAN',
       subHeader: 'DOKUMENTASI PENGUJIAN DAN KODE SUMBER',
@@ -248,70 +274,85 @@ export async function generateSampleThesisPdf(): Promise<{ buffer: ArrayBuffer; 
       const subLines = wrapText(pageData.subHeader, fontBold, 12, width - 120);
       subLines.forEach((sLine) => {
         page.drawText(sLine, {
-          x: width / 2 - (fontBold.widthOfTextAtSize(sLine, 12) / 2),
+          x: width / 2 - fontBold.widthOfTextAtSize(sLine, 12) / 2,
           y: currentY,
           size: 12,
           font: fontBold,
-          color: rgb(0.2, 0.25, 0.4),
+          color: rgb(0.2, 0.25, 0.35),
         });
         currentY -= 18;
       });
       currentY -= 10;
     }
 
-    currentY -= 20;
+    currentY -= 15;
 
-    // Body text lines
-    pageData.bodyLines.forEach((bLine) => {
-      if (bLine === '') {
-        currentY -= 14;
-        return;
+    // Body Lines
+    for (const bLine of pageData.bodyLines) {
+      if (!bLine) {
+        currentY -= 12;
+        continue;
       }
 
-      const fontToUse = pageData.isToc ? fontRegular : (/^[0-9]\.|^Judul|^Nama|^NIM/i.test(bLine) ? fontBold : fontRegular);
-      page.drawText(bLine, {
-        x: 60,
-        y: currentY,
-        size: pageData.isToc ? 9.5 : 10.5,
-        font: fontToUse,
-        color: rgb(0.15, 0.18, 0.22),
-      });
-      currentY -= 16;
-    });
+      const isDotted = bLine.includes('....');
+      const fontToUse = isDotted ? fontRegular : (bLine.startsWith('"') ? fontItalic : fontRegular);
+      const fontSize = isDotted ? 9.5 : 11;
 
-    // Page Numbering Footer
-    const pageNumText = idx < 5 ? ['i', 'ii', 'iii', 'iv', 'v'][idx] : String(idx - 5 + 1);
-    page.drawText(`- ${pageNumText} -`, {
-      x: width / 2 - (fontRegular.widthOfTextAtSize(`- ${pageNumText} -`, 9) / 2),
-      y: 40,
-      size: 9,
+      // Wrap if line is too long
+      const wrapped = wrapText(bLine, fontToUse, fontSize, width - 120);
+      for (const wLine of wrapped) {
+        page.drawText(wLine, {
+          x: 60,
+          y: currentY,
+          size: fontSize,
+          font: fontToUse,
+          color: isDotted ? rgb(0.3, 0.3, 0.35) : rgb(0.12, 0.14, 0.18),
+        });
+        currentY -= isDotted ? 15 : 17;
+      }
+    }
+
+    // Page Number Footer (centered at bottom)
+    const pageNumText = String(idx + 1);
+    const numWidth = fontRegular.widthOfTextAtSize(pageNumText, 10);
+    page.drawText(pageNumText, {
+      x: width / 2 - numWidth / 2,
+      y: 35,
+      size: 10,
       font: fontRegular,
-      color: rgb(0.4, 0.45, 0.5),
+      color: rgb(0.5, 0.55, 0.6),
     });
   }
 
   const pdfBytes = await pdfDoc.save();
   return {
     buffer: pdfBytes.buffer as ArrayBuffer,
-    filename: 'Contoh_Skripsi_Lengkap.pdf',
+    filename: 'Sample_Skripsi_Lengkap_Universitas.pdf',
   };
 }
 
-function wrapText(text: string, font: any, size: number, maxWidth: number): string[] {
+/**
+ * Helper to wrap text into multiple lines given a max width
+ */
+function wrapText(text: string, font: any, fontSize: number, maxWidth: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
   let currentLine = '';
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const testWidth = font.widthOfTextAtSize(testLine, size);
+  for (let i = 0; i < words.length; i++) {
+    const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
     if (testWidth > maxWidth && currentLine) {
       lines.push(currentLine);
-      currentLine = word;
+      currentLine = words[i];
     } else {
       currentLine = testLine;
     }
   }
-  if (currentLine) lines.push(currentLine);
-  return lines;
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines.length > 0 ? lines : [text];
 }

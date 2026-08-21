@@ -69,8 +69,78 @@ export function formatSectionTitle(rawHeading: string, defaultTitle: string, pat
   cleaned = cleaned.replace(/(\.{2,}|\u2026).*$/g, '').trim();
   cleaned = cleaned.replace(/\s+\d+\s*$/g, '').trim();
 
-  if (cleaned.length < 3) {
+  if (cleaned.length < 2) {
     return defaultTitle;
+  }
+
+  // Standardized frontmatter names
+  if (patternKey === 'cover') {
+    return 'Cover Skripsi';
+  }
+  if (patternKey === 'title_page') {
+    return 'Halaman Judul';
+  }
+  if (patternKey === 'publication_approval') {
+    return 'Halaman Persetujuan Publikasi';
+  }
+  if (patternKey === 'approval_advisor') {
+    if (/halaman/i.test(cleaned)) return 'Halaman Persetujuan';
+    return 'Lembar Persetujuan';
+  }
+  if (patternKey === 'approval_examiner' || patternKey === 'approval') {
+    if (/publikasi/i.test(cleaned)) return 'Halaman Persetujuan Publikasi';
+    if (/persetujuan/i.test(cleaned) && !/pengesahan/i.test(cleaned)) {
+      return /halaman/i.test(cleaned) ? 'Halaman Persetujuan' : 'Lembar Persetujuan';
+    }
+    if (/halaman/i.test(cleaned)) return 'Halaman Pengesahan';
+    return 'Lembar Pengesahan';
+  }
+  if (patternKey === 'declaration') {
+    return 'Pernyataan Keaslian';
+  }
+  if (patternKey === 'motto') {
+    return 'Halaman Motto';
+  }
+  if (patternKey === 'dedication') {
+    return 'Halaman Persembahan';
+  }
+  if (patternKey === 'dedication_motto') {
+    if (/motto/i.test(cleaned) && !/persembahan/i.test(cleaned)) return 'Halaman Motto';
+    if (/persembahan|kupersembahkan/i.test(cleaned) && !/motto/i.test(cleaned)) return 'Halaman Persembahan';
+    return 'Halaman Motto & Persembahan';
+  }
+  if (patternKey === 'abstract_id') {
+    return 'Abstrak';
+  }
+  if (patternKey === 'abstract_en') {
+    return 'Abstract';
+  }
+  if (patternKey === 'preface') {
+    return 'Kata Pengantar';
+  }
+  if (patternKey === 'toc') {
+    return 'Daftar Isi';
+  }
+  if (patternKey === 'table_list') {
+    return 'Daftar Tabel';
+  }
+  if (patternKey === 'figure_list') {
+    return 'Daftar Gambar';
+  }
+  if (patternKey === 'appendix_list') {
+    return 'Daftar Lampiran';
+  }
+  if (patternKey === 'bibliography') {
+    return 'Daftar Pustaka';
+  }
+  if (patternKey === 'appendix') {
+    if (/lampiran\s+[a-z0-9]+/i.test(cleaned)) {
+      return cleaned.toUpperCase();
+    }
+    return 'Lampiran';
+  }
+  if (patternKey === 'curriculum_vitae') {
+    return 'Riwayat Hidup';
   }
 
   // If pattern is a chapter like bab_1, format neatly e.g. "BAB I - PENDAHULUAN"
@@ -99,7 +169,7 @@ export function calculateConfidence(
   rawText: string,
   ctx: EvaluationContext
 ): { confidence: number; isToc: boolean; needsReview: boolean; notes: string[] } {
-  let confidence = 70;
+  let confidence = 75;
   const notes: string[] = [];
   let isToc = false;
 
@@ -107,10 +177,27 @@ export function calculateConfidence(
   const isTocLine = isLikelyTocLine(trimmed) || ctx.hasDotLeader || ctx.hasTrailingPageNumber;
 
   // 1. Critical ToC Reference check
-  if (isTocLine || ctx.isInsideTocPage) {
+  if (isTocLine) {
     isToc = true;
-    confidence = Math.min(confidence, 15);
+    confidence = 10;
     notes.push('Terdeteksi sebagai referensi Daftar Isi (memiliki titik-titik/nomor halaman rujukan)');
+    return { confidence, isToc, needsReview: true, notes };
+  }
+
+  // If inside a ToC page:
+  // Allow the heading "DAFTAR ISI" itself if at top of the ToC page (line position <= 2)
+  if (ctx.isInsideTocPage) {
+    if (pattern.key === 'toc' && ctx.linePositionInUnit <= 2) {
+      // This is the Table of Contents heading itself!
+      confidence = 98;
+      notes.push('Judul halaman Daftar Isi');
+      return { confidence, isToc: false, needsReview: false, notes };
+    }
+
+    // Otherwise, other patterns (like BAB I ... in the middle of ToC page) are ToC entries
+    isToc = true;
+    confidence = 10;
+    notes.push('Terdeteksi di dalam halaman Daftar Isi');
     return { confidence, isToc, needsReview: true, notes };
   }
 
@@ -126,6 +213,8 @@ export function calculateConfidence(
   if (ctx.linePositionInUnit <= 2) {
     confidence += 15;
     notes.push('Posisi berada di baris awal halaman');
+  } else if (ctx.linePositionInUnit <= 5) {
+    confidence += 5;
   }
 
   // 3. Document Styling cues (DOCX)
@@ -171,7 +260,7 @@ export function calculateConfidence(
 
   // Cap confidence
   confidence = Math.max(5, Math.min(99, confidence));
-  const needsReview = confidence < 75;
+  const needsReview = confidence < 70;
 
   if (needsReview) {
     notes.push('Perlu diperiksa');

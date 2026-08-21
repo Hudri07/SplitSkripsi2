@@ -12,12 +12,12 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
   // Frontmatter
   {
     key: 'cover',
-    defaultTitle: 'Cover / Halaman Depan',
+    defaultTitle: 'Cover Skripsi',
     category: 'frontmatter',
     priority: 1,
     regexList: [
-      /^(?:halaman\s+)?(?:sampul|cover|judul\s+luar)$/i,
-      /^(?:proposal\s+skripsi|laporan\s+tugas\s+akhir|laporan\s+skripsi|skripsi)$/i,
+      /^(?:halaman\s+)?(?:sampul|cover|judul\s+luar)(?:\s+skripsi|\s+tugas\s+akhir|\s+laporan)?$/i,
+      /^(?:cover\s+skripsi|sampul\s+skripsi|sampul\s+depan)$/i,
     ],
   },
   {
@@ -26,19 +26,49 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 2,
     regexList: [
-      /^(?:halaman\s+judul|title\s+page)$/i,
+      /^(?:halaman\s+judul|title\s+page|judul\s+dalam)(?:\s+skripsi|\s+tugas\s+akhir)?$/i,
       /^diajukan\s+(?:untuk|sebagai\s+salah\s+satu\s+syarat)/i,
     ],
   },
+  // Distinct Lembar Persetujuan (Pembimbing / Proposal / Ujian)
   {
-    key: 'approval',
-    defaultTitle: 'Lembar Pengesahan',
+    key: 'approval_advisor',
+    defaultTitle: 'Lembar Persetujuan',
     category: 'frontmatter',
     priority: 3,
     regexList: [
-      /^(?:lembar(?:an)?\s+)?(?:pengesahan|persetujuan|pembimbing|penguji)(?:\s+skripsi|\s+tugas\s+akhir|\s+tesis)?$/i,
-      /^tanda\s+persetujuan(?:\s+skripsi|\s+tugas\s+akhir)?$/i,
+      /^(?:lembar(?:an)?\s+|halaman\s+|surat\s+|tanda\s+)?persetujuan(?:\s+skripsi|\s+tugas\s+akhir|\s+tesis|\s+pembimbing|\s+komisi\s+pembimbing|\s+dosen\s+pembimbing|\s+seminar|\s+ujian|\s+naskah)?$/i,
+      /^(?:lembar\s+|halaman\s+)?persetujuan\s+(?:pembimbing|dosen\s+pembimbing|komisi\s+pembimbing)$/i,
+      /^persetujuan\s+pembimbing$/i,
+      /^persetujuan\s+skripsi$/i,
+      /^tanda\s+persetujuan(?:\s+skripsi)?$/i,
+    ],
+  },
+  // Distinct Lembar Pengesahan (Tim Penguji / Dekan / Dewan Penguji)
+  {
+    key: 'approval_examiner',
+    defaultTitle: 'Lembar Pengesahan',
+    category: 'frontmatter',
+    priority: 3.2,
+    regexList: [
+      /^(?:lembar(?:an)?\s+|halaman\s+|tanda\s+)?pengesahan(?:\s+skripsi|\s+tugas\s+akhir|\s+tesis|\s+penguji|\s+tim\s+penguji|\s+dewan\s+penguji|\s+laporan)?$/i,
+      /^(?:lembar\s+|halaman\s+)?pengesahan\s+(?:tim\s+penguji|dewan\s+penguji|panitia\s+ujian|dekan)$/i,
+      /^pengesahan\s+skripsi$/i,
+      /^lembar\s+pengesahan$/i,
       /^approval\s+sheet$/i,
+    ],
+  },
+  {
+    key: 'publication_approval',
+    defaultTitle: 'Halaman Persetujuan Publikasi',
+    category: 'frontmatter',
+    priority: 3.5,
+    regexList: [
+      /^(?:halaman\s+|lembar\s+|surat\s+)?(?:pernyataan\s+)?persetujuan\s+publikasi(?:\s+karya\s+ilmiah|\s+skripsi|\s+tugas\s+akhir|\s+laporan)?(?:\s+untuk\s+kepentingan\s+akademis?)?$/i,
+      /^(?:halaman\s+|lembar\s+)?persetujuan\s+publikasi\s+(?:karya\s+ilmiah|skripsi|tugas\s+akhir|laporan)/i,
+      /^(?:halaman\s+|lembar\s+)?persetujuan\s+publikasi/i,
+      /^persetujuan\s+publikasi/i,
+      /^persetujuan\s+unggahan?\s+karya\s+ilmiah/i,
     ],
   },
   {
@@ -47,17 +77,41 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 4,
     regexList: [
-      /^(?:surat\s+|lembar\s+)?pernyataan\s+(?:keaslian|orisionalitas|bebas\s+plagiat|integritas|otentisitas)(?:\s+skripsi|\s+karya\s+ilmiah)?$/i,
+      /^(?:surat\s+|lembar\s+|halaman\s+)?pernyataan\s+(?:keaslian|orisinalitas|orisionalitas|bebas\s+plagiat|bebas\s+plagiarisme|integritas|otentisitas)(?:\s+skripsi|\s+karya\s+ilmiah|\s+tulisan)?$/i,
+      /^pernyataan\s+keaslian\s+skripsi$/i,
       /^statement\s+of\s+(?:originality|authenticity)$/i,
+    ],
+  },
+  {
+    key: 'motto',
+    defaultTitle: 'Halaman Motto',
+    category: 'frontmatter',
+    priority: 5,
+    regexList: [
+      /^(?:halaman\s+|lembar\s+)?motto(?:\s+hidup|\s+dan\s+semboyan)?$/i,
+      /^(?:lembar\s+|halaman\s+)?(?:motto|semboyan)$/i,
+      /^motto\s*$/i,
+    ],
+  },
+  {
+    key: 'dedication',
+    defaultTitle: 'Halaman Persembahan',
+    category: 'frontmatter',
+    priority: 5.2,
+    regexList: [
+      /^(?:halaman\s+|lembar\s+)?(?:persembahan|dedikasi|dedication)$/i,
+      /^kupersembahkan(?:\s+karya\s+ini|\s+skripsi\s+ini)?$/i,
+      /^halaman\s+persembahan$/i,
+      /^persembahan$/i,
     ],
   },
   {
     key: 'dedication_motto',
     defaultTitle: 'Halaman Persembahan & Motto',
     category: 'frontmatter',
-    priority: 5,
+    priority: 5.5,
     regexList: [
-      /^(?:halaman\s+)?(?:persembahan|motto|motto\s+dan\s+persembahan|dedication)$/i,
+      /^(?:halaman\s+|lembar\s+)?(?:motto\s+dan\s+persembahan|persembahan\s+dan\s+motto)$/i,
     ],
   },
   {
@@ -66,7 +120,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 6,
     regexList: [
-      /^abstrak(?:\s*\(indonesia\))?$/i,
+      /^abstrak(?:\s*\(indonesia\)|\s+bahasa\s+indonesia)?$/i,
       /^abstrak\s*$/i,
       /^ringkasan(?:\s+eksekutif)?$/i,
     ],
@@ -77,8 +131,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 7,
     regexList: [
-      /^abstract$/i,
-      /^abstract\s*\(english\)$/i,
+      /^abstract(?:\s*\(english\)|\s+in\s+english)?$/i,
+      /^abstract\s*$/i,
       /^executive\s+summary$/i,
     ],
   },
@@ -108,7 +162,7 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 10,
     regexList: [
-      /^daftar\s+tabel$/i,
+      /^daftar\s+tabel(?:\s+dan\s+lampiran)?$/i,
       /^list\s+of\s+tables?$/i,
     ],
   },
@@ -118,10 +172,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 11,
     regexList: [
-      /^daftar\s+gambar$/i,
-      /^list\s+of\s+figures?$/i,
-      /^daftar\s+grafik$/i,
-      /^daftar\s+bagan$/i,
+      /^daftar\s+(?:gambar|grafik|bagan|diagram|peta)$/i,
+      /^list\s+of\s+(?:figures|illustrations|diagrams|charts)$/i,
     ],
   },
   {
@@ -130,11 +182,8 @@ export const ACADEMIC_PATTERNS: SectionPattern[] = [
     category: 'frontmatter',
     priority: 12,
     regexList: [
-      /^daftar\s+lampiran$/i,
+      /^daftar\s+(?:lampiran|singkatan|simbol|notasi|istilah)(?:\s+dan\s+(?:istilah|singkatan|simbol))?$/i,
       /^list\s+of\s+appendi(?:x|ces)$/i,
-      /^daftar\s+singkatan(?:\s+dan\s+istilah)?$/i,
-      /^daftar\s+simbol$/i,
-      /^daftar\s+notasi$/i,
     ],
   },
 

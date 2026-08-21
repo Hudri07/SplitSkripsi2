@@ -240,10 +240,39 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
     if (sections.length <= 1) return;
     // Sort sections by start page
     const sorted = [...sections].sort((a, b) => a.start - b.start);
+    
+    // Find first chapter index if any
+    const firstChapIdx = sorted.findIndex((s) => /^bab\s+|^chapter\s+/i.test(s.title) || s.normalizedKey?.startsWith('bab_'));
+
     const bridged = sorted.map((sec, idx) => {
+      const isCover = idx === 0 && (sec.normalizedKey === 'cover' || /cover|sampul/i.test(sec.title)) && sec.start === 1;
+      
+      // Cover Skripsi is locked strictly to page 1
+      if (isCover) {
+        return {
+          ...sec,
+          order: idx + 1,
+          start: 1,
+          end: 1,
+          count: 1,
+        };
+      }
+
       const isLast = idx === sorted.length - 1;
       const nextStart = isLast ? metadata.totalUnits : sorted[idx + 1].start;
-      const end = isLast ? metadata.totalUnits : Math.max(sec.start, nextStart - 1);
+
+      // If this is in frontmatter zone (before first chapter)
+      const isFrontmatter = firstChapIdx !== -1 && idx < firstChapIdx;
+      let end = sec.end;
+
+      if (isFrontmatter) {
+        end = Math.min(sec.end, nextStart - 1);
+        if (end < sec.start) end = sec.start;
+      } else {
+        // Chapters & Backmatter bridge contiguously to the start of next section - 1
+        end = isLast ? metadata.totalUnits : Math.max(sec.start, nextStart - 1);
+      }
+
       const count = Math.max(1, end - sec.start + 1);
       return {
         ...sec,
