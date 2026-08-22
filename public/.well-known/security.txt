@@ -1,0 +1,6 @@
+Contact: mailto:hudri366@gmail.com
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: id, en
+Canonical: https://ais-pre-mt5mzrz3w5o4ag4ehb6y4i-490628249454.asia-southeast1.run.app/.well-known/security.txt
+Policy: https://ais-pre-mt5mzrz3w5o4ag4ehb6y4i-490628249454.asia-southeast1.run.app/security
+Acknowledgments: https://ais-pre-mt5mzrz3w5o4ag4ehb6y4i-490628249454.asia-southeast1.run.app

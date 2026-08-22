@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="50%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#090D16"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF385C"/>
+      <stop offset="100%" stop-color="#E00B41"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1050" cy="150" r="300" fill="#FF385C" opacity="0.12" filter="blur(60px)"/>
+  <circle cx="150" cy="500" r="250" fill="#3B82F6" opacity="0.1" filter="blur(60px)"/>
+  
+  <g transform="translate(100, 140)">
+    <rect width="72" height="72" rx="20" fill="url(#accent)"/>
+    <path d="M26 22h14l8 8v20a2 2 0 0 1-2 2H26a2 2 0 0 1-2-2V24a2 2 0 0 1 2-2z" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="40 22 40 30 48 30" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="30" y1="38" x2="42" y2="38" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="30" y1="44" x2="38" y2="44" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <text x="190" y="190" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#FFFFFF" letter-spacing="-0.02em">
+    Split<tspan fill="#FF385C">Skripsi</tspan>
+  </text>
+  <text x="100" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="800" fill="#FFFFFF" letter-spacing="-0.03em">
+    Pemisah Bab Dokumen Skripsi PDF Otomatis
+  </text>
+  <text x="100" y="370" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="400" fill="#94A3B8" width="900">
+    Ekstrak cover, lembar pengesahan, bab 1-5, dan daftar pustaka menjadi PDF mandiri.
+  </text>
+  <text x="100" y="415" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="400" fill="#94A3B8">
+    100% aman diproses langsung di browser &amp; terintegrasi Google Drive.
+  </text>
+
+  <g transform="translate(100, 480)">
+    <rect width="260" height="52" rx="26" fill="#1E293B" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="30" cy="26" r="6" fill="#10B981"/>
+    <text x="50" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">
+      Format Akademik Resmi
+    </text>
+  </g>
+  <g transform="translate(380, 480)">
+    <rect width="250" height="52" rx="26" fill="#1E293B" stroke="#334155" stroke-width="1.5"/>
+    <circle cx="30" cy="26" r="6" fill="#3B82F6"/>
+    <text x="50" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="#E2E8F0">
+      Google Drive Sync
+    </text>
+  </g>
+</svg>
