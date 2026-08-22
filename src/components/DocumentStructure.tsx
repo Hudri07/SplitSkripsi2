@@ -23,6 +23,9 @@ import {
   Layers,
   Smartphone,
   Monitor,
+  Combine,
+  Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface DocumentStructureProps {
@@ -57,6 +60,14 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
   const [deleteWarningModal, setDeleteWarningModal] = useState<{ title: string; message: string } | null>(null);
 
+  // Merge selected sections state & modal
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [mergeTitle, setMergeTitle] = useState('');
+  const [mergeStartStr, setMergeStartStr] = useState<string>('1');
+  const [mergeEndStr, setMergeEndStr] = useState<string>('1');
+  const [mergeSuggestions, setMergeSuggestions] = useState<string[]>([]);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'info'; text: string } | null>(null);
+
   // Smart suggestion: track manual deletions and show bulk delete tip if deleted 2 or 3 times
   const [manualDeleteCount, setManualDeleteCount] = useState<number>(0);
   const [showBulkTip, setShowBulkTip] = useState<boolean>(false);
@@ -71,6 +82,13 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
   // Long press handling refs
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressTriggeredRef = useRef<boolean>(false);
+
+  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
+    setToastMessage({ type, text });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4500);
+  };
 
   // --- Inline Edit Handlers ---
   const handleStartEdit = (sec: DocumentSection) => {
@@ -185,6 +203,101 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
     onUpdateSections(remaining);
     setSelectedIds(new Set());
     setIsBulkDeleteModalOpen(false);
+    showToast(`Berhasil menghapus ${selectedIds.size} bagian.`);
+  };
+
+  // --- Merge Selected Sections Handlers ---
+  const handleRequestMerge = (targetIds?: Set<string>) => {
+    const ids = targetIds || selectedIds;
+    if (ids.size < 2) {
+      setDeleteWarningModal({
+        title: 'Pilih Minimal 2 Bagian',
+        message: 'Silakan pilih atau centang minimal 2 bagian/kartu yang ingin Anda gabungkan menjadi satu berkas PDF.',
+      });
+      return;
+    }
+
+    const targetSections = sections.filter((s) => ids.has(s.id));
+    if (targetSections.length < 2) return;
+
+    // Sort by start page
+    targetSections.sort((a, b) => a.start - b.start);
+
+    const minStart = Math.min(...targetSections.map((s) => s.start));
+    const maxEnd = Math.max(...targetSections.map((s) => s.end));
+
+    // Generate smart name suggestions based on selection
+    const allTitlesLower = targetSections.map((s) => s.title.toLowerCase());
+    const suggestions: string[] = [];
+
+    const hasCover = allTitlesLower.some((t) => /cover|sampul|judul/i.test(t));
+    const hasPengesahan = allTitlesLower.some((t) => /pengesahan|persetujuan/i.test(t));
+    const hasDaftar = allTitlesLower.some((t) => /daftar\s+(isi|gambar|tabel|lampiran)/i.test(t));
+    const hasAbstrak = allTitlesLower.some((t) => /abstrak|abstract/i.test(t));
+    const hasLampiran = allTitlesLower.every((t) => /lampiran/i.test(t));
+
+    if (hasCover && (hasPengesahan || hasDaftar || hasAbstrak)) {
+      suggestions.push('BAGIAN AWAL SKRIPSI');
+      suggestions.push('COVER & HALAMAN DEPAN');
+      suggestions.push('COVER, PENGESAHAN & DAFTAR ISI');
+    } else if (hasLampiran) {
+      suggestions.push('KUMPULAN LAMPIRAN');
+      suggestions.push('LAMPIRAN LENGKAP');
+    } else if (targetSections.length === 2) {
+      suggestions.push(`${targetSections[0].title} & ${targetSections[1].title}`);
+    } else {
+      const shortCombined = targetSections.map((s) => s.title.replace(/^halaman\s+/i, '')).slice(0, 3).join(', ');
+      suggestions.push(shortCombined.toUpperCase());
+    }
+
+    suggestions.push(`GABUNGAN ${targetSections.length} BAGIAN`);
+
+    // Remove duplicates
+    const uniqueSuggestions = Array.from(new Set(suggestions)).filter(Boolean);
+
+    setMergeTitle(uniqueSuggestions[0] || 'BAGIAN AWAL SKRIPSI');
+    setMergeStartStr(String(minStart));
+    setMergeEndStr(String(maxEnd));
+    setMergeSuggestions(uniqueSuggestions);
+    setIsMergeModalOpen(true);
+  };
+
+  const handleConfirmMerge = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mergeTitle.trim()) return;
+
+    const startNum = Math.max(1, parseInt(mergeStartStr, 10) || 1);
+    const endNum = Math.max(startNum, parseInt(mergeEndStr, 10) || startNum);
+    const count = endNum - startNum + 1;
+
+    // Find earliest index of selected sections
+    const firstSelectedIndex = sections.findIndex((s) => selectedIds.has(s.id));
+    const insertIndex = firstSelectedIndex !== -1 ? firstSelectedIndex : 0;
+
+    const mergedSec: DocumentSection = {
+      id: `merged_${Date.now()}`,
+      order: 1,
+      title: mergeTitle.trim(),
+      normalizedKey: mergeTitle.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+      start: startNum,
+      end: endNum,
+      count: count,
+      confidence: 100,
+      isCustom: true,
+      needsReview: false,
+    };
+
+    // Filter out all merged sections and insert the new merged one in place
+    const remaining = sections.filter((s) => !selectedIds.has(s.id));
+    remaining.splice(insertIndex, 0, mergedSec);
+
+    const updated = remaining.map((s, idx) => ({ ...s, order: idx + 1 }));
+
+    onUpdateSections(updated);
+    const mergedCount = selectedIds.size;
+    setSelectedIds(new Set());
+    setIsMergeModalOpen(false);
+    showToast(`Berhasil menggabungkan ${mergedCount} bagian menjadi "${mergedSec.title}" (Hal. ${startNum}-${endNum}).`);
   };
 
   // --- Long Press Handlers for Touch Devices ---
@@ -399,6 +512,26 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
         </div>
       )}
 
+      {/* Toast Notification Banner */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold ${
+              toastMessage.type === 'success'
+                ? 'bg-neutral-900 text-white border-neutral-800 shadow-neutral-950/30'
+                : 'bg-blue-900 text-white border-blue-800 shadow-blue-950/30'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage.text}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Bulk Action Sticky Bar (Appears when >= 1 item is selected) */}
       <AnimatePresence>
         {isSelectionMode && (
@@ -418,12 +551,25 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
                   {selectedIds.size} bagian dipilih
                 </p>
                 <p className="text-[11px] text-neutral-400 hidden sm:block">
-                  Tahan kartu untuk memilih lebih banyak atau gunakan tombol di bawah
+                  Pilih 2 atau lebih untuk digabung jadi 1 berkas, atau hapus bagian yang tidak dibutuhkan
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Merge Button (Prominent when >= 2 items selected) */}
+              {selectedIds.size >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => handleRequestMerge()}
+                  className="btn-rausch px-4 py-1.5 text-white rounded-full text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer transition-all active:scale-95 animate-pulse"
+                  title="Gabungkan bagian-bagian terpilih menjadi satu berkas PDF dengan nama kustom"
+                >
+                  <Combine className="w-3.5 h-3.5" />
+                  <span>Gabungkan ({selectedIds.size}) Jadi 1 Bagian</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleSelectAll}
@@ -443,10 +589,10 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
               <button
                 type="button"
                 onClick={handleRequestBulkDelete}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-rose-600/30 cursor-pointer transition-colors"
+                className="px-3.5 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/80 rounded-full text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Hapus Terpilih ({selectedIds.size})</span>
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Hapus Terpilih</span>
               </button>
             </div>
           </motion.div>
@@ -464,15 +610,27 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
               </span>
             </h3>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Klik ikon mata untuk preview halaman bab tertentu. Tahan kartu pada HP untuk memilih dan menghapus massal (*bulk delete*).
+              Pilih beberapa kartu lalu klik <strong>Gabungkan</strong> untuk menyatukan Cover, Pengesahan, atau Lampiran.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Merge trigger if items selected */}
+            {selectedIds.size >= 2 && (
+              <button
+                type="button"
+                onClick={() => handleRequestMerge()}
+                className="btn-rausch px-3.5 py-2 text-white rounded-full text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-97"
+              >
+                <Combine className="w-3.5 h-3.5" />
+                <span>Gabungkan ({selectedIds.size})</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleAutoBridgeContiguous}
-              title="Rapatkan rentang bab secara otomatis agar bab saat ini menyambung penuh hingga halaman sebelum bab berikutnya (misal BAB IV Hal 40-77 jika BAB V mulai Hal 78)"
+              title="Rapatkan rentang bab secara otomatis agar bab saat ini menyambung penuh hingga halaman sebelum bab berikutnya"
               className="px-3.5 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer border border-neutral-200/80 shadow-2xs active:scale-97"
             >
               <Layers className="w-3.5 h-3.5 text-[#FF385C]" />
@@ -1066,6 +1224,174 @@ export const DocumentStructure: React.FC<DocumentStructureProps> = ({
           <span>{isSplitting ? 'Memproses...' : 'Split Dokumen'}</span>
         </button>
       </div>
+
+      {/* Merge Selected Sections Modal */}
+      <AnimatePresence>
+        {isMergeModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 14 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 14 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-white rounded-3xl border border-neutral-200 w-full max-w-lg shadow-2xl overflow-hidden p-6 sm:p-7 space-y-5 text-neutral-900"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FF385C] text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-500/20">
+                    <Combine className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 inline-block mb-1">
+                      Gabungkan Bagian Terpilih
+                    </span>
+                    <h3 className="font-bold text-neutral-900 text-base sm:text-lg leading-snug">
+                      Satukan {selectedIds.size} Bagian Menjadi 1
+                    </h3>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsMergeModalOpen(false)}
+                  className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Original parts preview list */}
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block">
+                  Bagian yang akan disatukan:
+                </label>
+                <div className="max-h-36 overflow-y-auto airbnb-scrollbar space-y-1.5 p-2.5 bg-neutral-50 rounded-2xl border border-neutral-200/80">
+                  {sections
+                    .filter((s) => selectedIds.has(s.id))
+                    .map((sec, i) => (
+                      <div
+                        key={sec.id}
+                        className="flex items-center justify-between px-3 py-1.5 bg-white rounded-xl border border-neutral-200/70 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <span className="w-5 h-5 rounded-full bg-neutral-100 font-mono text-[10px] font-bold text-neutral-600 flex items-center justify-center shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="font-semibold text-neutral-800 truncate">{sec.title}</span>
+                        </div>
+                        <span className="font-mono text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-md text-[11px] shrink-0">
+                          Hal. {sec.start}-{sec.end}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmMerge} className="space-y-4 text-xs">
+                {/* Custom Name with Quick Suggestions */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-neutral-700 block">
+                      Nama Bagian Gabungan (Kustom):
+                    </label>
+                    <span className="text-[11px] text-neutral-400">Bisa diubah bebas</span>
+                  </div>
+
+                  <input
+                    type="text"
+                    required
+                    value={mergeTitle}
+                    onChange={(e) => setMergeTitle(e.target.value)}
+                    placeholder="Misal: BAGIAN AWAL SKRIPSI atau COVER & PENGESAHAN"
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF385C]/30 text-xs font-bold text-neutral-900"
+                    autoFocus
+                  />
+
+                  {/* Suggestion Chips */}
+                  {mergeSuggestions.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[10px] font-semibold text-neutral-400 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-[#FF385C]" />
+                        Saran Cepat:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {mergeSuggestions.map((sug, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setMergeTitle(sug)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer border ${
+                              mergeTitle === sug
+                                ? 'bg-rose-50 text-rose-700 border-rose-300 font-bold shadow-2xs'
+                                : 'bg-neutral-100/80 text-neutral-700 border-neutral-200/80 hover:bg-neutral-200'
+                            }`}
+                          >
+                            {sug}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Page Range Display & Editing */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="font-semibold text-neutral-700 block mb-1">
+                      Halaman Awal Gabungan
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={mergeStartStr}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setMergeStartStr(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl font-mono text-center font-bold text-xs text-neutral-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-semibold text-neutral-700 block mb-1">
+                      Halaman Akhir Gabungan
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={mergeEndStr}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setMergeEndStr(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl font-mono text-center font-bold text-xs text-neutral-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-emerald-900 text-[11px] flex items-center justify-between">
+                  <span>Hasil gabungan: <strong>{Math.max(1, (parseInt(mergeEndStr, 10) || 1) - (parseInt(mergeStartStr, 10) || 1) + 1)} Halaman</strong></span>
+                  <span className="font-mono font-bold text-emerald-700">Hal. {mergeStartStr} - {mergeEndStr}</span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsMergeModalOpen(false)}
+                    className="px-5 py-2.5 rounded-full border border-neutral-300 text-neutral-700 font-semibold text-xs hover:bg-neutral-50 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-rausch px-6 py-2.5 rounded-full text-white font-bold text-xs shadow-md shadow-rose-500/25 transition-all cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <Combine className="w-4 h-4" />
+                    <span>Gabungkan Menjadi 1 Bagian</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add New Section Modal (Airbnb Sheet Aesthetic) with Framer Motion */}
       <AnimatePresence>
